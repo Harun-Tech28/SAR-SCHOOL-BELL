@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useStore } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { SettingsIcon, Volume2, Clock, Mic, Wifi } from "lucide-react"
+import { SettingsIcon, Volume2, Clock, Mic, Wifi, Sparkles, Key } from "lucide-react"
 import { VOICE_OPTIONS } from "@/lib/voice-utils"
 import { AudioUpload } from "@/components/audio-upload"
 import { PWAStatus } from "@/components/pwa-status"
@@ -28,6 +28,18 @@ export function Settings() {
     updateSettings(tempSettings)
     alert("Settings saved successfully!")
   }
+
+  // Group voices by provider
+  const groupedVoices = Object.entries(VOICE_OPTIONS).reduce((acc, [key, option]) => {
+    let group = "Browser Voices (Free)"
+    if (key.startsWith("openai")) group = "OpenAI (Natural)"
+    if (key.startsWith("elevenlabs")) group = "ElevenLabs (Premium)"
+    if (key.startsWith("azure")) group = "Azure (Standard)"
+
+    if (!acc[group]) acc[group] = []
+    acc[group].push({ key: key as VoiceType, ...option })
+    return acc
+  }, {} as Record<string, typeof VOICE_OPTIONS[keyof typeof VOICE_OPTIONS] & { key: VoiceType }[]>)
 
   return (
     <div className="p-8">
@@ -58,14 +70,15 @@ export function Settings() {
                 }
                 className="w-full p-2 border border-border rounded-lg bg-background text-foreground"
               >
-                <optgroup label="Browser Voices (Free)">
-                  <option value="standard-male">Male Voice</option>
-                  <option value="standard-female">Female Voice</option>
-                  <option value="azan-islamic">Islamic Azan</option>
-                  <option value="hausa">Hausa</option>
-                  <option value="twi">Twi</option>
-                  <option value="arabic">Arabic</option>
-                </optgroup>
+                {Object.entries(groupedVoices).map(([group, voices]) => (
+                  <optgroup key={group} label={group}>
+                    {voices.map((voice: any) => (
+                      <option key={voice.key} value={voice.key}>
+                        {voice.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
               <p className="text-xs text-foreground/60 mt-2">{VOICE_OPTIONS[tempSettings.defaultVoice].description}</p>
             </div>
@@ -124,6 +137,178 @@ export function Settings() {
               />
               <p className="text-xs text-foreground/60 mt-1">How many times to ring the bell BEFORE the voice plays</p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* AI Voice Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              AI Voice Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2 mb-4">
+              <input
+                type="checkbox"
+                id="ai-enabled"
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                checked={tempSettings.aiVoice?.aiVoiceEnabled ?? false}
+                onChange={(e) =>
+                  setTempSettings({
+                    ...tempSettings,
+                    aiVoice: {
+                      ...tempSettings.aiVoice!,
+                      aiVoiceEnabled: e.target.checked
+                    }
+                  })
+                }
+              />
+              <label htmlFor="ai-enabled" className="text-sm font-medium leading-none">
+                Enable Natural AI Voices
+              </label>
+            </div>
+
+            {tempSettings.aiVoice?.aiVoiceEnabled && (
+              <div className="space-y-4 border-t pt-4">
+                <div>
+                  <label className="text-sm font-semibold text-foreground mb-2 block">Primary Provider</label>
+                  <select
+                    value={tempSettings.aiVoice.primaryProvider}
+                    onChange={(e) =>
+                      setTempSettings({
+                        ...tempSettings,
+                        aiVoice: {
+                          ...tempSettings.aiVoice!,
+                          primaryProvider: e.target.value as any
+                        }
+                      })
+                    }
+                    className="w-full p-2 border border-border rounded-lg bg-background text-foreground"
+                  >
+                    <option value="openai">OpenAI (Best Quality)</option>
+                    <option value="elevenlabs">ElevenLabs (Most Natural)</option>
+                    <option value="azure">Azure (Fastest)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Key className="w-4 h-4" /> API Keys
+                  </h3>
+
+                  {/* OpenAI Config */}
+                  <div className="p-3 bg-background/50 rounded-lg border">
+                    <label className="text-xs font-medium block mb-1">OpenAI API Key</label>
+                    <input
+                      type="password"
+                      placeholder="sk-..."
+                      value={tempSettings.aiVoice.providerConfigs.openai.apiKey}
+                      onChange={(e) =>
+                        setTempSettings({
+                          ...tempSettings,
+                          aiVoice: {
+                            ...tempSettings.aiVoice!,
+                            providerConfigs: {
+                              ...tempSettings.aiVoice!.providerConfigs,
+                              openai: {
+                                ...tempSettings.aiVoice!.providerConfigs.openai,
+                                apiKey: e.target.value,
+                                enabled: !!e.target.value
+                              }
+                            }
+                          }
+                        })
+                      }
+                      className="w-full p-2 text-sm border border-border rounded bg-background"
+                    />
+                  </div>
+
+                  {/* ElevenLabs Config */}
+                  <div className="p-3 bg-background/50 rounded-lg border">
+                    <label className="text-xs font-medium block mb-1">ElevenLabs API Key</label>
+                    <input
+                      type="password"
+                      placeholder="xi-..."
+                      value={tempSettings.aiVoice.providerConfigs.elevenlabs.apiKey}
+                      onChange={(e) =>
+                        setTempSettings({
+                          ...tempSettings,
+                          aiVoice: {
+                            ...tempSettings.aiVoice!,
+                            providerConfigs: {
+                              ...tempSettings.aiVoice!.providerConfigs,
+                              elevenlabs: {
+                                ...tempSettings.aiVoice!.providerConfigs.elevenlabs,
+                                apiKey: e.target.value,
+                                enabled: !!e.target.value
+                              }
+                            }
+                          }
+                        })
+                      }
+                      className="w-full p-2 text-sm border border-border rounded bg-background"
+                    />
+                  </div>
+
+                  {/* Azure Config */}
+                  <div className="p-3 bg-background/50 rounded-lg border space-y-2">
+                    <div>
+                      <label className="text-xs font-medium block mb-1">Azure Speech Key</label>
+                      <input
+                        type="password"
+                        value={tempSettings.aiVoice.providerConfigs.azure.apiKey}
+                        onChange={(e) =>
+                          setTempSettings({
+                            ...tempSettings,
+                            aiVoice: {
+                              ...tempSettings.aiVoice!,
+                              providerConfigs: {
+                                ...tempSettings.aiVoice!.providerConfigs,
+                                azure: {
+                                  ...tempSettings.aiVoice!.providerConfigs.azure,
+                                  apiKey: e.target.value,
+                                  enabled: !!e.target.value && !!tempSettings.aiVoice!.providerConfigs.azure.endpoint
+                                }
+                              }
+                            }
+                          })
+                        }
+                        className="w-full p-2 text-sm border border-border rounded bg-background"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium block mb-1">Azure Region (e.g., eastus)</label>
+                      <input
+                        type="text"
+                        placeholder="eastus"
+                        value={tempSettings.aiVoice.providerConfigs.azure.endpoint?.split('.')[0].replace('https://', '') || ''}
+                        onChange={(e) => {
+                          const region = e.target.value;
+                          const endpoint = region ? `https://${region}.tts.speech.microsoft.com/` : '';
+                          setTempSettings({
+                            ...tempSettings,
+                            aiVoice: {
+                              ...tempSettings.aiVoice!,
+                              providerConfigs: {
+                                ...tempSettings.aiVoice!.providerConfigs,
+                                azure: {
+                                  ...tempSettings.aiVoice!.providerConfigs.azure,
+                                  endpoint: endpoint,
+                                  enabled: !!tempSettings.aiVoice!.providerConfigs.azure.apiKey && !!endpoint
+                                }
+                              }
+                            }
+                          })
+                        }}
+                        className="w-full p-2 text-sm border border-border rounded bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -206,10 +391,8 @@ export function Settings() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Custom Audio Library */}
-      <div className="mt-6">
+        {/* Custom Audio Library */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -225,9 +408,8 @@ export function Settings() {
             <AudioUpload />
           </CardContent>
         </Card>
-      </div>
 
-      <div className="mt-6">
+        {/* Background & Offline */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -255,7 +437,9 @@ export function Settings() {
         </Card>
 
         {/* PWA Status */}
-        <PWAStatus />
+        <div className="lg:col-span-2">
+          <PWAStatus />
+        </div>
       </div>
 
       <div className="mt-8 flex gap-3">
