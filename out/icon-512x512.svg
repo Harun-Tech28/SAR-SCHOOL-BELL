@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#DC2626"/>
+  
+  <!-- Bell icon -->
+  <g transform="translate(256, 256)">
+    <!-- Bell body -->
+    <path d="M -102.4 -51.2 
+             Q -102.4 -128 0 -153.6
+             Q 102.4 -128 102.4 -51.2
+             L 128 76.8
+             Q 128 102.4 102.4 115.2
+             L -102.4 115.2
+             Q -128 102.4 -128 76.8
+             Z" 
+          fill="#FCD34D" 
+          stroke="white" 
+          stroke-width="5.12"/>
+    
+    <!-- Bell clapper -->
+    <circle cx="0" cy="128" r="20.48" fill="white"/>
+    
+    <!-- Bell top -->
+    <rect x="-20.48" y="-166.4" 
+          width="40.96" height="25.6" 
+          fill="white" rx="5.12"/>
+  </g>
+  
+  <!-- Text for larger icons -->
+  
+  <text x="256" y="435.2" 
+        font-family="Arial, sans-serif" 
+        font-size="40.96" 
+        font-weight="bold"
+        fill="white" 
+        text-anchor="middle">SAR</text>
+  
+</svg>

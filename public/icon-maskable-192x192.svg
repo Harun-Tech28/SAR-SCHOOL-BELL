@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="192" height="192" fill="#DC2626"/>
+  
+  <!-- Bell icon -->
+  <g transform="translate(96, 96)">
+    <!-- Bell body -->
+    <path d="M -30.72 -15.36 
+             Q -30.72 -38.4 0 -46.08
+             Q 30.72 -38.4 30.72 -15.36
+             L 38.4 23.04
+             Q 38.4 30.72 30.72 34.56
+             L -30.72 34.56
+             Q -38.4 30.72 -38.4 23.04
+             Z" 
+          fill="#FCD34D" 
+          stroke="white" 
+          stroke-width="1.92"/>
+    
+    <!-- Bell clapper -->
+    <circle cx="0" cy="38.4" r="6.144" fill="white"/>
+    
+    <!-- Bell top -->
+    <rect x="-6.144" y="-49.92" 
+          width="12.288" height="7.68" 
+          fill="white" rx="1.536"/>
+  </g>
+  
+  <!-- Text for larger icons -->
+  
+</svg>
