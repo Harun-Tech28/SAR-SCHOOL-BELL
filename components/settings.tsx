@@ -30,16 +30,19 @@ export function Settings() {
   }
 
   // Group voices by provider
+  // Group voices by provider
+  type VoiceOptionWithKey = typeof VOICE_OPTIONS[keyof typeof VOICE_OPTIONS] & { key: VoiceType }
+
   const groupedVoices = Object.entries(VOICE_OPTIONS).reduce((acc, [key, option]) => {
     let group = "Browser Voices (Free)"
     if (key.startsWith("openai")) group = "OpenAI (Natural)"
     if (key.startsWith("elevenlabs")) group = "ElevenLabs (Premium)"
     if (key.startsWith("azure")) group = "Azure (Standard)"
 
-    if (!acc[group]) acc[group] = []
+    if (!acc[group]) acc[group] = [] as VoiceOptionWithKey[]
     acc[group].push({ key: key as VoiceType, ...option })
     return acc
-  }, {} as Record<string, typeof VOICE_OPTIONS[keyof typeof VOICE_OPTIONS] & { key: VoiceType }[]>)
+  }, {} as Record<string, VoiceOptionWithKey[]>)
 
   return (
     <div className="p-8">
