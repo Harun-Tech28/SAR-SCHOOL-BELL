@@ -1,3 +1,0 @@
-module.exports=[37160,a=>{a.n(a.i(64297))},82703,a=>{a.n(a.i(97784))},80780,a=>{a.n(a.i(19209))},30714,a=>{a.n(a.i(40277))},61487,a=>{a.n(a.i(38169))},38169,(a,b,c)=>{"use strict";Object.defineProperty(c,"__esModule",{value:!0}),Object.defineProperty(c,"default",{enumerable:!0,get:function(){return f}});let d=a.r(13903),e=a.r(40983);function f(){return(0,d.jsx)(e.HTTPAccessErrorFallback,{status:401,message:"You're not authorized to access this page."})}("function"==typeof c.default||"object"==typeof c.default&&null!==c.default)&&void 0===c.default.__esModule&&(Object.defineProperty(c.default,"__esModule",{value:!0}),Object.assign(c.default,c),b.exports=c.default)}];
-
-//# sourceMappingURL=Downloads_school-bell-system_d1102642._.js.map
