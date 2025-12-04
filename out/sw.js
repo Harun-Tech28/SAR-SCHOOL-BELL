@@ -22,6 +22,9 @@ const PRECACHE_ASSETS = [
   '/apple-icon.png',
 ];
 
+// Note: Bell sounds are generated using Web Audio API and don't require caching
+// They work offline automatically as they're synthesized in the browser
+
 // Install event - precache essential assets
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
