@@ -2,6 +2,8 @@
 
 A comprehensive, modern web-based school automation system for managing bell schedules, announcements, student calls, and Islamic prayer times with AI-powered voice generation.
 
+![GitHub Pages](https://github.com/Harun-Tech28/SAR-SCHOOL-BELL/actions/workflows/deploy.yml/badge.svg)
+
 ## 🎯 Overview
 
 SchoolBell is a complete school automation platform designed to streamline daily operations in educational institutions. It combines traditional bell scheduling with modern AI voice technology to deliver professional, multilingual announcements and automated prayer calls.
