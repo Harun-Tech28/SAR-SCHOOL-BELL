@@ -20,8 +20,8 @@ const nextConfig = {
   trailingSlash: true,
 
   // Base path for GitHub Pages (if deploying to username.github.io/repo-name)
-  // Leave empty if deploying to custom domain or username.github.io
-  basePath: '/SAR-SCHOOL-BELL',
+  // Only apply in production to ensure localhost works at root
+  basePath: process.env.NODE_ENV === 'production' ? '/SAR-SCHOOL-BELL' : '',
 
 
 }
