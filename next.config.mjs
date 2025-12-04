@@ -23,8 +23,7 @@ const nextConfig = {
   // Leave empty if deploying to custom domain or username.github.io
   basePath: '/SAR-SCHOOL-BELL',
 
-  // Asset prefix for GitHub Pages
-  assetPrefix: '/SAR-SCHOOL-BELL/',
+
 }
 
 export default nextConfig
