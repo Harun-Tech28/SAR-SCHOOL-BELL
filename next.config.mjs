@@ -21,10 +21,10 @@ const nextConfig = {
   
   // Base path for GitHub Pages (if deploying to username.github.io/repo-name)
   // Leave empty if deploying to custom domain or username.github.io
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  basePath: '/SAR-BELL-SYSTEM',
   
   // Asset prefix for GitHub Pages
-  assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  assetPrefix: '/SAR-BELL-SYSTEM/',
 }
 
 export default nextConfig
