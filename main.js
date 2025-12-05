@@ -1,13 +1,16 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
-const Store = require('electron-store');
+let store;
+
 const { getStorageManager } = require('./electron/storage-manager');
 const { getAudioScheduler } = require('./electron/audio-scheduler');
 const { getAudioPlayer } = require('./electron/audio-player');
 
-// Initialize electron-store for app configuration
-const store = new Store();
+async function initStore() {
+    const { default: Store } = await import('electron-store');
+    store = new Store();
+}
 
 // Initialize storage manager
 const storageManager = getStorageManager();
@@ -65,7 +68,7 @@ function createWindow() {
     // Show window when ready
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        
+
         // Initialize audio player with window reference
         audioPlayer = getAudioPlayer(mainWindow);
     });
@@ -213,7 +216,7 @@ function createTray() {
     // Create tray icon
     const iconPath = path.join(__dirname, 'build/tray-icon.png');
     const trayIcon = nativeImage.createFromPath(iconPath);
-    
+
     tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
     tray.setToolTip('Ghana School Bell System');
 
@@ -408,19 +411,19 @@ ipcMain.handle('get-audio-queue-status', async () => {
 // Handle audio trigger events from scheduler
 audioScheduler.on('audio-trigger', (audioData) => {
     console.log(`[AudioScheduler] Audio triggered: ${audioData.id}`);
-    
+
     // Send notification
     if (Notification.isSupported()) {
         const notificationTitle = audioData.config.title || 'School Bell';
         const notificationBody = audioData.config.announcement || 'Bell is ringing';
-        
+
         new Notification({
             title: notificationTitle,
             body: notificationBody,
             icon: path.join(__dirname, 'build/icon.png')
         }).show();
     }
-    
+
     // Send event to renderer process to trigger audio playback
     if (mainWindow) {
         mainWindow.webContents.send('scheduled-audio-trigger', audioData);
@@ -430,7 +433,7 @@ audioScheduler.on('audio-trigger', (audioData) => {
 // Handle audio playback events
 audioScheduler.on('play-audio', async (audioData) => {
     console.log(`[AudioScheduler] Play audio: ${audioData.id}`);
-    
+
     try {
         // Use audio player to handle playback
         if (audioPlayer) {
@@ -448,12 +451,12 @@ audioScheduler.on('play-audio', async (audioData) => {
 // Audio playback completion handler
 ipcMain.on('audio-playback-complete', (event, audioId, success, error) => {
     console.log(`[IPC] Audio playback complete: ${audioId}, success: ${success}`);
-    
+
     // Notify audio player
     if (audioPlayer) {
         audioPlayer.audioCompleted(audioId, success, error);
     }
-    
+
     // Notify scheduler to process next in queue
     audioScheduler.audioFinished();
 });
@@ -500,6 +503,7 @@ ipcMain.handle('get-default-audio-device', async () => {
 
 // App lifecycle
 app.whenReady().then(async () => {
+    await initStore();
     await ensureDataDirectory();
     createWindow();
     createTray();
@@ -531,10 +535,10 @@ app.on('before-quit', async (event) => {
     if (!app.isQuitting) {
         event.preventDefault();
         app.isQuitting = true;
-        
+
         // Give time for any pending writes to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         app.quit();
     }
 });

@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store"
 import { playAzanCall, getTTSStatus } from "@/lib/voice-utils"
 import { CompleteBellSystem } from "@/lib/complete-bell-system"
 import { BellSystemStatus } from "./bell-system-status"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { isElectron } from "@/lib/electron-utils"
 
 // Helper function to derive task type from timetable name
@@ -25,6 +25,7 @@ const deriveTaskType = (name: string): string => {
 }
 
 import { registerBellSync, syncTimetablesToSW } from "@/lib/background-sync"
+import { initBellWorker, updateWorkerSchedules, checkSchedulesNow, terminateBellWorker } from "@/lib/background-bell-manager"
 import { InstallButton } from "@/components/install-button"
 
 export function Dashboard() {
@@ -34,6 +35,64 @@ export function Dashboard() {
   const [ttsStatus, setTtsStatus] = useState({ available: true, message: "TTS is ready" })
   const [isElectronApp, setIsElectronApp] = useState(false)
   const [audioQueueStatus, setAudioQueueStatus] = useState<any>(null)
+  const [backgroundWorkerActive, setBackgroundWorkerActive] = useState(false)
+
+  // Handler for bell triggers from web worker
+  const handleWorkerBellTrigger = useCallback(async (schedule: { id: string; name: string; time: string; day: string }) => {
+    console.log("[Dashboard] Bell triggered from worker:", schedule.name)
+
+    // Find the full timetable entry
+    const timetable = timetables.find(t => t.id === schedule.id)
+    if (!timetable) {
+      console.warn("[Dashboard] Timetable not found for schedule:", schedule.id)
+      return
+    }
+
+    // Generate message
+    let message: string
+    if (timetable.customMessage) {
+      message = timetable.customMessage
+    } else {
+      const taskType = deriveTaskType(timetable.name)
+      switch (taskType) {
+        case "class":
+          message = `Attention all students, it is time for ${timetable.name}. Please proceed to your classrooms.`
+          break
+        case "break":
+          message = `Attention all students, it is time for ${timetable.name}. You may now leave your classrooms.`
+          break
+        case "assembly":
+          message = `Attention all students and staff, it is time for ${timetable.name}. Please proceed to the assembly hall.`
+          break
+        case "lunch":
+          message = `Attention all students, it is time for ${timetable.name}. Please proceed to the dining hall.`
+          break
+        case "dismissal":
+          message = `Attention all students, it is time for ${timetable.name}. Please collect your belongings and proceed to the exit.`
+          break
+        case "emergency":
+          message = `Emergency alert. ${timetable.name}. All students and staff must follow emergency procedures immediately.`
+          break
+        default:
+          message = `Attention all students, it is time for ${timetable.name}.`
+      }
+    }
+
+    // Play the bell sequence
+    await CompleteBellSystem.playBellSequence(
+      timetable.name,
+      message,
+      {
+        bellType: timetable.bellType as any,
+        voice: timetable.voice as any || settings.defaultVoice,
+        language: settings.defaultLanguage,
+        repeatCount: settings.defaultRepeatCount,
+        bellRingsBeforeVoice: settings.defaultBellRingsBeforeVoice || 3,
+        useHighQualityVoice: true,
+        customAudioId: timetable.customAudioId
+      }
+    )
+  }, [timetables, settings])
 
   useEffect(() => {
     // Check TTS status on client side only
@@ -42,10 +101,22 @@ export function Dashboard() {
     // Check if running in Electron
     setIsElectronApp(isElectron())
 
-    // Register background sync if enabled (PWA only)
-    if (settings.backgroundEnabled && !isElectron()) {
+    // Initialize background worker for PWA (always enabled now for reliable background)
+    if (!isElectron()) {
+      initBellWorker(handleWorkerBellTrigger)
+      setBackgroundWorkerActive(true)
       registerBellSync()
+      console.log("[Dashboard] Background bell worker initialized")
     }
+
+    // Handle visibility change - check schedules when returning from background
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[Dashboard] Page became visible, checking schedules")
+        checkSchedulesNow()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     // Load Electron audio queue status
     if (isElectron() && window.electronAPI) {
@@ -60,16 +131,25 @@ export function Dashboard() {
 
       // Update queue status every 5 seconds
       const interval = setInterval(loadQueueStatus, 5000)
-      return () => clearInterval(interval)
+      return () => {
+        clearInterval(interval)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
     }
-  }, [settings.backgroundEnabled])
 
-  // Sync timetables to SW whenever they change
-  useEffect(() => {
-    if (settings.backgroundEnabled) {
-      syncTimetablesToSW(timetables)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (!isElectron()) {
+        terminateBellWorker()
+      }
     }
-  }, [timetables, settings.backgroundEnabled])
+  }, [handleWorkerBellTrigger])
+
+  // Sync timetables to both SW and Web Worker whenever they change
+  useEffect(() => {
+    syncTimetablesToSW(timetables)
+    updateWorkerSchedules(timetables)
+  }, [timetables])
 
   useEffect(() => {
     if (!settings.azanEnabled || !settings.prayerTimes) return
@@ -110,21 +190,21 @@ export function Dashboard() {
 
     const scheduleTimetablesInElectron = async () => {
       console.log('[Electron] Scheduling timetables for today...')
-      
+
       const now = new Date()
       const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
-      
+
       for (const timetable of timetables) {
         // Check if this timetable applies today
         if (timetable.day !== "Daily" && timetable.day !== currentDay) {
           continue
         }
-        
+
         // Parse time and create schedule date
         const [hours, minutes] = timetable.bellTime.split(':').map(Number)
         const scheduleTime = new Date()
         scheduleTime.setHours(hours, minutes, 0, 0)
-        
+
         // Only schedule future times
         if (scheduleTime > now) {
           // Generate message
@@ -156,7 +236,7 @@ export function Dashboard() {
                 message = `Attention all students, it is time for ${timetable.name}.`
             }
           }
-          
+
           // Schedule via Electron audio scheduler
           const audioConfig = {
             type: 'combined',
@@ -166,7 +246,7 @@ export function Dashboard() {
             repeat: settings.defaultRepeatCount || 1,
             title: timetable.name
           }
-          
+
           const result = await window.electronAPI!.scheduleAudio(scheduleTime, audioConfig)
           if (result.success) {
             console.log(`[Electron] Scheduled: ${timetable.name} at ${timetable.bellTime} (ID: ${result.id})`)
@@ -176,10 +256,10 @@ export function Dashboard() {
         }
       }
     }
-    
+
     // Schedule timetables
     scheduleTimetablesInElectron()
-    
+
     // Re-schedule every hour to catch new day transitions
     const interval = setInterval(scheduleTimetablesInElectron, 3600000) // Every hour
     return () => clearInterval(interval)
@@ -189,7 +269,7 @@ export function Dashboard() {
   useEffect(() => {
     // Skip if in Electron mode (use Electron scheduler instead)
     if (isElectronApp) return
-    
+
     if (timetables.length === 0) return
 
     const checkTimetables = async () => {
@@ -400,17 +480,17 @@ export function Dashboard() {
     // Show different stat based on Electron vs PWA
     isElectronApp
       ? {
-          title: "Scheduled Audio",
-          value: audioQueueStatus?.scheduledCount || 0,
-          icon: Calendar,
-          color: "text-cyan-600",
-        }
+        title: "Scheduled Audio",
+        value: audioQueueStatus?.scheduledCount || 0,
+        icon: Calendar,
+        color: "text-cyan-600",
+      }
       : {
-          title: "Connected Devices",
-          value: devices.filter((d) => d.status === "online").length,
-          icon: Wifi,
-          color: "text-orange-600",
-        },
+        title: "Connected Devices",
+        value: devices.filter((d) => d.status === "online").length,
+        icon: Wifi,
+        color: "text-orange-600",
+      },
   ]
 
   return (
@@ -477,7 +557,7 @@ export function Dashboard() {
                   <p className="text-sm font-semibold">Offline Desktop</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                   <Calendar className="w-5 h-5 text-blue-600" />
@@ -487,7 +567,7 @@ export function Dashboard() {
                   <p className="text-sm font-semibold">{audioQueueStatus.scheduledCount} queued</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
                 <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                   <Volume2 className="w-5 h-5 text-purple-600" />
@@ -500,7 +580,7 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-            
+
             {audioQueueStatus.currentlyPlaying && (
               <div className="mt-4 p-3 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-lg border border-purple-200 dark:border-purple-800">
                 <p className="text-xs text-muted-foreground mb-1">Currently Playing</p>

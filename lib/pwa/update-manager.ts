@@ -60,7 +60,7 @@ export class UpdateManager {
 
     try {
       await this.registration.update();
-      
+
       return {
         available: this.updateAvailable,
         version: this.getVersion(),
@@ -73,18 +73,11 @@ export class UpdateManager {
 
   /**
    * Apply the pending update
-   * NOTE: This will reload the page, so only call when user explicitly requests it
+   * NOTE: Does not reload automatically to prevent data loss
    */
   async applyUpdate(): Promise<void> {
     if (!this.updateAvailable) {
       console.warn('[UpdateManager] No update available to apply');
-      return;
-    }
-
-    // Warn user before reloading
-    const confirmed = confirm('This will reload the page to apply the update. Any unsaved changes will be lost. Continue?');
-    if (!confirmed) {
-      console.log('[UpdateManager] Update cancelled by user');
       return;
     }
 
@@ -93,8 +86,9 @@ export class UpdateManager {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
 
-    // Reload the page to activate the new service worker
-    window.location.reload();
+    // Inform user but don't force reload
+    console.log('[UpdateManager] Update applied. Reload the page when convenient to use the updated version.');
+    this.updateAvailable = false;
   }
 
   /**
@@ -110,7 +104,7 @@ export class UpdateManager {
         console.error('[UpdateManager] Failed to store skipped version:', error);
       }
     }
-    
+
     this.updateAvailable = false;
   }
 
@@ -131,7 +125,7 @@ export class UpdateManager {
    */
   onUpdateAvailable(callback: UpdateCallback): () => void {
     this.updateCallbacks.push(callback);
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.updateCallbacks.indexOf(callback);

@@ -16,27 +16,8 @@ export function PWAInit() {
       console.error("Failed to initialize storage:", error);
     });
 
-    // TEMPORARILY DISABLE SERVICE WORKER TO PREVENT AUTO-RELOADS
-    // This is causing the page to reload and delete timetables
-    console.log("⚠️ Service Worker DISABLED to prevent auto-reloads");
-    console.log("⚠️ Offline features temporarily unavailable");
-    
-    // Unregister any existing service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister().then((success) => {
-            if (success) {
-              console.log("✅ Unregistered service worker to prevent reloads");
-            }
-          });
-        }
-      });
-    }
-    
-    // TODO: Re-enable service worker after fixing reload issues
-    // Uncomment the code below when ready:
-    /*
+    // Register service worker for offline support
+    // Fixed: Removed automatic page reloads that were causing data loss
     registerServiceWorker({
       onSuccess: () => {
         console.log("✅ App is ready for offline use");
@@ -58,7 +39,6 @@ export function PWAInit() {
         console.error("Service worker registration failed:", error);
       },
     });
-    */
 
     // Listen for bell play events from service worker
     const handleBellPlay = (event: Event) => {

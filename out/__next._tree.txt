@@ -1,2 +1,2 @@
-:HL["/SAR-SCHOOL-BELL/_next/static/chunks/497f523a60eab811.css","style"]
-0:{"buildId":"RbYuEMhcZxtxLae7mZCKM","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
+:HL["/_next/static/chunks/4a9fd219b00dc3ed.css","style"]
+0:{"buildId":"VzlEjMJ3fhsk7LW6XEken","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":true},"staleTime":300}
