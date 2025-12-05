@@ -19,9 +19,10 @@ const nextConfig = {
   // Configure trailing slashes for better static hosting compatibility
   trailingSlash: true,
 
-  // Base path for GitHub Pages (if deploying to username.github.io/repo-name)
-  // Only apply in production to ensure localhost works at root
-  basePath: process.env.NODE_ENV === 'production' ? '/SAR-SCHOOL-BELL' : '',
+  // Base path configuration
+  // For Netlify: no basePath needed (deploys to root domain)
+  // For GitHub Pages: uncomment the line below
+  // basePath: process.env.NODE_ENV === 'production' ? '/SAR-SCHOOL-BELL' : '',
 
 
 }
