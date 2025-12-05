@@ -441,7 +441,7 @@ export function Timetable() {
                   <option value="">No custom audio (use text-to-speech)</option>
                   {availableAudios.map((audio) => (
                     <option key={audio.id} value={audio.id}>
-                      {audio.name} ({Math.floor(audio.duration)}s)
+                      {audio.name} ({audio.duration ? Math.floor(audio.duration) : '?'}s)
                     </option>
                   ))}
                 </select>
