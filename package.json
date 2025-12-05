@@ -2,6 +2,7 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "main": "main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -31,7 +32,7 @@
       "node_modules/electron-store/**/*"
     ],
     "directories": {
-      "output": "dist-electron",
+      "output": "build-output",
       "buildResources": "build"
     },
     "extraResources": [
@@ -50,9 +51,16 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "icon": "build/icon.ico"
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -133,6 +141,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
+    "electron-serve": "^3.0.0",
     "electron-store": "^11.0.2",
     "embla-carousel-react": "8.5.1",
     "idb": "^8.0.0",
@@ -165,7 +174,6 @@
     "@types/react-dom": "^19",
     "electron": "^39.2.5",
     "electron-builder": "^26.0.12",
-    "electron-serve": "^3.0.0",
     "electron-updater": "^6.6.2",
     "fast-check": "^4.3.0",
     "jest": "^30.2.0",

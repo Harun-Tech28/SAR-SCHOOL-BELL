@@ -75,7 +75,7 @@ export function registerServiceWorker(config: ServiceWorkerConfig = {}): void {
     // Listen for messages from service worker
     navigator.serviceWorker.addEventListener('message', (event) => {
       console.log('[SW] Message from service worker:', event.data);
-      
+
       if (event.data.type === 'PLAY_BELL') {
         // Handle bell play request from service worker
         window.dispatchEvent(new CustomEvent('sw-play-bell', {
@@ -97,12 +97,12 @@ export async function unregisterServiceWorker(): Promise<boolean> {
   try {
     const registration = await navigator.serviceWorker.ready;
     const success = await registration.unregister();
-    
+
     if (success) {
       console.log('[SW] Service worker unregistered successfully');
       swRegistration = null;
     }
-    
+
     return success;
   } catch (error) {
     console.error('[SW] Service worker unregistration failed:', error);
@@ -152,6 +152,7 @@ export async function updateServiceWorker(): Promise<void> {
 
 /**
  * Skip waiting and activate new service worker immediately
+ * NOTE: Does not reload page automatically to prevent data loss
  */
 export function skipWaitingAndActivate(): void {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
@@ -159,7 +160,9 @@ export function skipWaitingAndActivate(): void {
   }
 
   navigator.serviceWorker.controller?.postMessage({ type: 'SKIP_WAITING' });
-  window.location.reload();
+  // Removed automatic reload to prevent data loss
+  // Users can reload manually when convenient
+  console.log('[SW] New service worker activated. Reload the page when convenient to use the updated version.');
 }
 
 /**
@@ -180,7 +183,7 @@ export async function getCacheInfo(): Promise<{
     for (const cacheName of cacheNames) {
       const cache = await caches.open(cacheName);
       const requests = await cache.keys();
-      
+
       for (const request of requests) {
         const response = await cache.match(request);
         if (response) {

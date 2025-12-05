@@ -1,7 +1,6 @@
 import type React from "react"
 // ... existing code ...
 import type { Metadata, Viewport } from "next"
-import { Analytics } from "@vercel/analytics/next"
 import { PWAInit } from "@/components/pwa-init"
 import { ElectronInit } from "@/components/electron-init"
 import { OfflineIndicator } from "@/components/offline-indicator"
@@ -82,7 +81,6 @@ export default function RootLayout({
         <ElectronInit />
         <OfflineIndicator position="top" showWhenOnline={true} />
         {children}
-        <Analytics />
       </body>
     </html>
   )
