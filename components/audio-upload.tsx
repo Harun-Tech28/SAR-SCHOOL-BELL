@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Upload, Trash2, Play, Pause, Music } from "lucide-react"
 import { audioStorage, type AudioMetadata } from "@/lib/audio-storage"
 
-export function AudioUpload() {
+interface AudioUploadProps {
+  onAudioUploaded?: () => void
+}
+
+export function AudioUpload({ onAudioUploaded }: AudioUploadProps = {}) {
   const [audios, setAudios] = useState<AudioMetadata[]>([])
   const [uploading, setUploading] = useState(false)
   const [playingId, setPlayingId] = useState<string | null>(null)
@@ -47,6 +51,10 @@ export function AudioUpload() {
       }
       
       await loadAudios()
+      // Notify parent component to refresh its audio list
+      if (onAudioUploaded) {
+        onAudioUploaded()
+      }
       alert('Audio files uploaded successfully!')
     } catch (error) {
       console.error('Error uploading audio:', error)
@@ -107,6 +115,10 @@ export function AudioUpload() {
 
       await audioStorage.deleteAudio(id)
       await loadAudios()
+      // Notify parent component to refresh its audio list
+      if (onAudioUploaded) {
+        onAudioUploaded()
+      }
     } catch (error) {
       console.error('Error deleting audio:', error)
       alert('Failed to delete audio file')
