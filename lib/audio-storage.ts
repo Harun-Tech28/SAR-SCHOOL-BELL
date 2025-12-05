@@ -151,3 +151,41 @@ class AudioStorage {
 
 // Export singleton instance
 export const audioStorage = new AudioStorage()
+
+/**
+ * Play stored audio by ID
+ * Returns a promise that resolves to true if playback was successful
+ */
+export async function playStoredAudio(audioId: string): Promise<boolean> {
+  try {
+    const url = await audioStorage.getAudioURL(audioId)
+    if (!url) {
+      console.error(`[AudioStorage] Audio not found: ${audioId}`)
+      return false
+    }
+
+    return new Promise((resolve) => {
+      const audio = new Audio(url)
+      
+      audio.addEventListener('ended', () => {
+        URL.revokeObjectURL(url)
+        resolve(true)
+      })
+      
+      audio.addEventListener('error', (error) => {
+        console.error(`[AudioStorage] Error playing audio ${audioId}:`, error)
+        URL.revokeObjectURL(url)
+        resolve(false)
+      })
+      
+      audio.play().catch((error) => {
+        console.error(`[AudioStorage] Failed to play audio ${audioId}:`, error)
+        URL.revokeObjectURL(url)
+        resolve(false)
+      })
+    })
+  } catch (error) {
+    console.error(`[AudioStorage] Exception playing audio ${audioId}:`, error)
+    return false
+  }
+}
