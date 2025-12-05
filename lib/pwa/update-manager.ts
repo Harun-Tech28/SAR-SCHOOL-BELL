@@ -73,10 +73,18 @@ export class UpdateManager {
 
   /**
    * Apply the pending update
+   * NOTE: This will reload the page, so only call when user explicitly requests it
    */
   async applyUpdate(): Promise<void> {
     if (!this.updateAvailable) {
       console.warn('[UpdateManager] No update available to apply');
+      return;
+    }
+
+    // Warn user before reloading
+    const confirmed = confirm('This will reload the page to apply the update. Any unsaved changes will be lost. Continue?');
+    if (!confirmed) {
+      console.log('[UpdateManager] Update cancelled by user');
       return;
     }
 

@@ -1,12 +1,13 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, Users, Volume2, Wifi } from "lucide-react"
+import { Bell, Users, Volume2, Wifi, Monitor, Calendar } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { playAzanCall, getTTSStatus } from "@/lib/voice-utils"
 import { CompleteBellSystem } from "@/lib/complete-bell-system"
 import { BellSystemStatus } from "./bell-system-status"
 import { useEffect, useRef, useState } from "react"
+import { isElectron } from "@/lib/electron-utils"
 
 // Helper function to derive task type from timetable name
 const deriveTaskType = (name: string): string => {
@@ -31,14 +32,35 @@ export function Dashboard() {
   const lastCheckedPrayerRef = useRef<string>("")
   const lastCheckedTimetableRef = useRef<string>("")
   const [ttsStatus, setTtsStatus] = useState({ available: true, message: "TTS is ready" })
+  const [isElectronApp, setIsElectronApp] = useState(false)
+  const [audioQueueStatus, setAudioQueueStatus] = useState<any>(null)
 
   useEffect(() => {
     // Check TTS status on client side only
     setTtsStatus(getTTSStatus())
 
-    // Register background sync if enabled
-    if (settings.backgroundEnabled) {
+    // Check if running in Electron
+    setIsElectronApp(isElectron())
+
+    // Register background sync if enabled (PWA only)
+    if (settings.backgroundEnabled && !isElectron()) {
       registerBellSync()
+    }
+
+    // Load Electron audio queue status
+    if (isElectron() && window.electronAPI) {
+      const loadQueueStatus = async () => {
+        if (!window.electronAPI) return
+        const result = await window.electronAPI.getAudioQueueStatus()
+        if (result.success) {
+          setAudioQueueStatus(result.data)
+        }
+      }
+      loadQueueStatus()
+
+      // Update queue status every 5 seconds
+      const interval = setInterval(loadQueueStatus, 5000)
+      return () => clearInterval(interval)
     }
   }, [settings.backgroundEnabled])
 
@@ -82,8 +104,92 @@ export function Dashboard() {
     return () => clearInterval(interval)
   }, [settings.azanEnabled, settings.prayerTimes])
 
-  // Timetable scheduler
+  // Electron timetable scheduler - Schedule all timetables for today
   useEffect(() => {
+    if (!isElectronApp || !window.electronAPI || timetables.length === 0) return
+
+    const scheduleTimetablesInElectron = async () => {
+      console.log('[Electron] Scheduling timetables for today...')
+      
+      const now = new Date()
+      const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' })
+      
+      for (const timetable of timetables) {
+        // Check if this timetable applies today
+        if (timetable.day !== "Daily" && timetable.day !== currentDay) {
+          continue
+        }
+        
+        // Parse time and create schedule date
+        const [hours, minutes] = timetable.bellTime.split(':').map(Number)
+        const scheduleTime = new Date()
+        scheduleTime.setHours(hours, minutes, 0, 0)
+        
+        // Only schedule future times
+        if (scheduleTime > now) {
+          // Generate message
+          let message: string
+          if (timetable.customMessage) {
+            message = timetable.customMessage
+          } else {
+            const taskType = deriveTaskType(timetable.name)
+            switch (taskType) {
+              case "class":
+                message = `Attention all students, it is time for ${timetable.name}. Please proceed to your classrooms.`
+                break
+              case "break":
+                message = `Attention all students, it is time for ${timetable.name}. You may now leave your classrooms.`
+                break
+              case "assembly":
+                message = `Attention all students and staff, it is time for ${timetable.name}. Please proceed to the assembly hall.`
+                break
+              case "lunch":
+                message = `Attention all students, it is time for ${timetable.name}. Please proceed to the dining hall.`
+                break
+              case "dismissal":
+                message = `Attention all students, it is time for ${timetable.name}. Please collect your belongings and proceed to the exit.`
+                break
+              case "emergency":
+                message = `Emergency alert. ${timetable.name}. All students and staff must follow emergency procedures immediately.`
+                break
+              default:
+                message = `Attention all students, it is time for ${timetable.name}.`
+            }
+          }
+          
+          // Schedule via Electron audio scheduler
+          const audioConfig = {
+            type: 'combined',
+            bellSound: timetable.bellType || 'bell',
+            announcement: message,
+            voice: timetable.voice || settings.defaultVoice,
+            repeat: settings.defaultRepeatCount || 1,
+            title: timetable.name
+          }
+          
+          const result = await window.electronAPI!.scheduleAudio(scheduleTime, audioConfig)
+          if (result.success) {
+            console.log(`[Electron] Scheduled: ${timetable.name} at ${timetable.bellTime} (ID: ${result.id})`)
+          } else {
+            console.error(`[Electron] Failed to schedule: ${timetable.name}`, result.error)
+          }
+        }
+      }
+    }
+    
+    // Schedule timetables
+    scheduleTimetablesInElectron()
+    
+    // Re-schedule every hour to catch new day transitions
+    const interval = setInterval(scheduleTimetablesInElectron, 3600000) // Every hour
+    return () => clearInterval(interval)
+  }, [timetables, settings.defaultVoice, settings.defaultLanguage, settings.defaultRepeatCount, isElectronApp])
+
+  // Browser/PWA timetable scheduler (original logic)
+  useEffect(() => {
+    // Skip if in Electron mode (use Electron scheduler instead)
+    if (isElectronApp) return
+    
     if (timetables.length === 0) return
 
     const checkTimetables = async () => {
@@ -291,12 +397,20 @@ export function Dashboard() {
       icon: Volume2,
       color: "text-purple-600",
     },
-    {
-      title: "Connected Devices",
-      value: devices.filter((d) => d.status === "online").length,
-      icon: Wifi,
-      color: "text-orange-600",
-    },
+    // Show different stat based on Electron vs PWA
+    isElectronApp
+      ? {
+          title: "Scheduled Audio",
+          value: audioQueueStatus?.scheduledCount || 0,
+          icon: Calendar,
+          color: "text-cyan-600",
+        }
+      : {
+          title: "Connected Devices",
+          value: devices.filter((d) => d.status === "online").length,
+          icon: Wifi,
+          color: "text-orange-600",
+        },
   ]
 
   return (
@@ -342,6 +456,62 @@ export function Dashboard() {
           )
         })}
       </div>
+
+      {/* Electron Status Card */}
+      {isElectronApp && audioQueueStatus && (
+        <Card className="mb-6 md:mb-8 shadow-xl border-border/50 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20">
+          <CardHeader className="border-b border-border/50">
+            <CardTitle className="text-lg md:text-xl font-semibold flex items-center gap-2">
+              <Monitor className="w-5 h-5 text-blue-600" />
+              Desktop Application Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <Monitor className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Mode</p>
+                  <p className="text-sm font-semibold">Offline Desktop</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Calendar className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Scheduled Audio</p>
+                  <p className="text-sm font-semibold">{audioQueueStatus.scheduledCount} queued</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <Volume2 className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Audio Queue</p>
+                  <p className="text-sm font-semibold">
+                    {audioQueueStatus.currentlyPlaying ? 'Playing' : audioQueueStatus.queueLength > 0 ? `${audioQueueStatus.queueLength} waiting` : 'Empty'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {audioQueueStatus.currentlyPlaying && (
+              <div className="mt-4 p-3 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                <p className="text-xs text-muted-foreground mb-1">Currently Playing</p>
+                <p className="text-sm font-medium">
+                  {audioQueueStatus.currentlyPlaying.config?.title || 'Audio'}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content Cards with Enhanced Shadows */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
