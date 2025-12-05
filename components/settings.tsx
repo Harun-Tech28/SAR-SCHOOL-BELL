@@ -20,11 +20,12 @@ export function Settings() {
   const [autoStartEnabled, setAutoStartEnabled] = useState(false)
   const [isElectronApp, setIsElectronApp] = useState(false)
 
+  const loadAudios = async () => {
+    const audios = await audioStorage.listAudios()
+    setAvailableAudios(audios)
+  }
+
   useEffect(() => {
-    const loadAudios = async () => {
-      const audios = await audioStorage.listAudios()
-      setAvailableAudios(audios)
-    }
     loadAudios()
 
     // Check if running in Electron
@@ -457,7 +458,7 @@ export function Settings() {
               Upload your own voice recordings or custom sounds to use in timetables and announcements.
               Files are stored locally in your browser.
             </p>
-            <AudioUpload />
+            <AudioUpload onAudioUploaded={loadAudios} />
           </CardContent>
         </Card>
 
