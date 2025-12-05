@@ -4,17 +4,21 @@ import { useState, useEffect } from "react"
 import { useStore } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { SettingsIcon, Volume2, Clock, Mic, Wifi, Sparkles, Key } from "lucide-react"
+import { SettingsIcon, Volume2, Clock, Mic, Wifi, Sparkles, Key, Monitor, Download, Upload } from "lucide-react"
 import { VOICE_OPTIONS } from "@/lib/voice-utils"
 import { AudioUpload } from "@/components/audio-upload"
 import { PWAStatus } from "@/components/pwa-status"
 import { audioStorage, type AudioMetadata } from "@/lib/audio-storage"
 import type { VoiceType } from "@/lib/store"
+import { isElectron } from "@/lib/electron-utils"
+import { printStorageDiagnostics, testPersistence, exportLocalStorage } from "@/lib/storage-diagnostics"
 
 export function Settings() {
   const { settings, updateSettings } = useStore()
   const [tempSettings, setTempSettings] = useState(settings)
   const [availableAudios, setAvailableAudios] = useState<AudioMetadata[]>([])
+  const [autoStartEnabled, setAutoStartEnabled] = useState(false)
+  const [isElectronApp, setIsElectronApp] = useState(false)
 
   useEffect(() => {
     const loadAudios = async () => {
@@ -22,11 +26,54 @@ export function Settings() {
       setAvailableAudios(audios)
     }
     loadAudios()
+
+    // Check if running in Electron
+    setIsElectronApp(isElectron())
+
+    // Load Electron settings
+    if (isElectron() && window.electronAPI) {
+      window.electronAPI.getAutoStart().then((result) => {
+        if (result.success && result.enabled !== undefined) {
+          setAutoStartEnabled(result.enabled)
+        }
+      })
+    }
   }, [])
 
   const handleSave = () => {
     updateSettings(tempSettings)
     alert("Settings saved successfully!")
+  }
+
+  const handleAutoStartToggle = async (enabled: boolean) => {
+    if (!window.electronAPI) return
+
+    const result = await window.electronAPI.setAutoStart(enabled)
+    if (result.success) {
+      setAutoStartEnabled(enabled)
+      alert(`Auto-start ${enabled ? 'enabled' : 'disabled'} successfully!`)
+    } else {
+      alert(`Failed to ${enabled ? 'enable' : 'disable'} auto-start: ${result.error}`)
+    }
+  }
+
+  const handleExportData = async () => {
+    if (!window.electronAPI) return
+
+    const result = await window.electronAPI.exportData()
+    if (result.success) {
+      alert('Data exported successfully!')
+    } else {
+      alert(`Failed to export data: ${result.error}`)
+    }
+  }
+
+  const handleImportData = async () => {
+    if (!window.electronAPI) return
+
+    // This would typically open a file dialog
+    // For now, we'll just show a message
+    alert('Import functionality will open a file dialog to select data to import')
   }
 
   // Group voices by provider
@@ -143,15 +190,16 @@ export function Settings() {
           </CardContent>
         </Card>
 
-        {/* AI Voice Configuration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              AI Voice Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {/* AI Voice Configuration - Hide in Electron */}
+        {!isElectronApp && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-500" />
+                AI Voice Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
             <div className="flex items-center space-x-2 mb-4">
               <input
                 type="checkbox"
@@ -314,6 +362,7 @@ export function Settings() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Islamic Settings */}
         <Card>
@@ -439,13 +488,202 @@ export function Settings() {
           </CardContent>
         </Card>
 
-        {/* PWA Status */}
-        <div className="lg:col-span-2">
-          <PWAStatus />
-        </div>
+        {/* Electron Desktop Features */}
+        {isElectronApp && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Monitor className="w-5 h-5 text-blue-500" />
+                Desktop Application Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Auto-start */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">System Integration</h3>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="auto-start"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      checked={autoStartEnabled}
+                      onChange={(e) => handleAutoStartToggle(e.target.checked)}
+                    />
+                    <label htmlFor="auto-start" className="text-sm font-medium leading-none">
+                      Start automatically when computer boots
+                    </label>
+                  </div>
+                  <p className="text-xs text-foreground/60 mt-2 ml-6">
+                    The bell system will launch automatically when you log in to your computer
+                  </p>
+                </div>
+
+                {/* Data Export/Import */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Data Management</h3>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportData}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export Data
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleImportData}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Import Data
+                    </Button>
+                  </div>
+                  <p className="text-xs text-foreground/60 mt-2">
+                    Backup or restore your settings, timetables, and student data
+                  </p>
+                </div>
+
+                {/* Offline Voice Info */}
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-semibold mb-2">Offline Voice Synthesis</h3>
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      ✓ Running in desktop mode with offline voice synthesis
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      All voice synthesis works without internet connection using bundled voice engines
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PWA Status - Only show if not in Electron */}
+        {!isElectronApp && (
+          <div className="lg:col-span-2">
+            <PWAStatus />
+          </div>
+        )}
       </div>
 
-      <div className="mt-8 flex gap-3">
+      {/* Storage Diagnostics */}
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SettingsIcon className="w-5 h-5 text-orange-500" />
+            Storage Diagnostics & Backup
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground/60">
+              Use these tools to diagnose storage issues and backup your data.
+            </p>
+            
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  printStorageDiagnostics()
+                  alert('Storage diagnostics printed to console. Press F12 to view.')
+                }}
+              >
+                Run Diagnostics
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const result = testPersistence()
+                  if (result) {
+                    alert('✅ Storage is working correctly!')
+                  } else {
+                    alert('❌ Storage test failed! Check console for details.')
+                  }
+                }}
+              >
+                Test Storage
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const data = exportLocalStorage()
+                  const blob = new Blob([data], { type: 'application/json' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `school-bell-backup-${Date.now()}.json`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                  alert('✅ Backup downloaded!')
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Backup Data
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = '.json'
+                  input.onchange = (e: any) => {
+                    const file = e.target.files[0]
+                    if (file) {
+                      const reader = new FileReader()
+                      reader.onload = (event) => {
+                        try {
+                          const { importLocalStorage } = require('@/lib/storage-diagnostics')
+                          const result = importLocalStorage(event.target?.result as string)
+                          if (result) {
+                            alert('✅ Data restored! Refreshing page...')
+                            window.location.reload()
+                          } else {
+                            alert('❌ Failed to restore data. Check console for details.')
+                          }
+                        } catch (error) {
+                          alert('❌ Failed to restore data: ' + error)
+                        }
+                      }
+                      reader.readAsText(file)
+                    }
+                  }
+                  input.click()
+                }}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Restore Backup
+              </Button>
+            </div>
+            
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>⚠️ Important:</strong> If your settings are being lost when you turn off your device:
+              </p>
+              <ul className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 ml-4 list-disc space-y-1">
+                <li>Make sure you're not in "Incognito/Private" browsing mode</li>
+                <li>Check that your browser allows localStorage</li>
+                <li>Try backing up your data regularly</li>
+                <li>Consider using the Desktop app (Electron) for better persistence</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="lg:col-span-2 mt-8 flex gap-3">
         <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white">
           <SettingsIcon className="w-4 h-4 mr-2" />
           Save Settings

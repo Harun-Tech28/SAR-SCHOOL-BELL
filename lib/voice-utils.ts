@@ -2,6 +2,8 @@ import type { Language, VoiceType } from "./store"
 import { getAIVoiceService } from "./ai-voice-service"
 import { AIVoiceError } from "./ai-voice-types"
 import { getVoiceFallbackHandler } from "./voice-fallback"
+import { isElectron } from "./electron-utils"
+import { playTextToSpeechOffline, isOfflineVoiceAvailable } from "./voice-utils-offline"
 
 export const VOICE_OPTIONS: Record<VoiceType, { name: string; language: Language; description: string }> = {
   "standard-male": { name: "Male Voice", language: "english", description: "Clear male voice" },
@@ -76,6 +78,13 @@ export const playTextToSpeech = async (
   language: Language = "english",
   repeatCount?: number
 ) => {
+  // In Electron, use offline voice service
+  if (isElectron()) {
+    console.log(`[Electron] Using offline voice service`)
+    return playTextToSpeechOffline(text, voice, language, repeatCount)
+  }
+
+  // In browser, use browser TTS
   // Get repeat count from store settings if not provided
   const { useStore } = await import("./store")
   const settings = useStore.getState().settings
@@ -234,19 +243,21 @@ export const playBrowserTTS = async (text: string, voice: VoiceType, language: L
       const findVoice = (keywords: string[], gender: 'male' | 'female') => {
         const lowerKeywords = keywords.map(k => k.toLowerCase())
 
-        // 1. PRIORITY: Look for "Natural" voices (Microsoft Edge/Online voices) or "Google" voices (Chrome)
-        // These are significantly better than standard desktop voices
+        // 1. TOP PRIORITY: Microsoft Edge Natural voices (best quality, online)
+        // Look for "Microsoft" + "Natural" + "Online" voices
         let match = voices.find(v => {
           const name = v.name.toLowerCase()
           const lang = v.lang.toLowerCase()
           const targetLang = langCode.split('-')[0].toLowerCase()
 
           return lang.startsWith(targetLang) &&
-            (name.includes("natural") || name.includes("google")) &&
+            name.includes("microsoft") &&
+            (name.includes("natural") || name.includes("online")) &&
             lowerKeywords.some(k => name.includes(k))
         })
 
-        // 2. Fallback to any Natural/Google voice of the correct language if keyword match fails
+        // 2. HIGH PRIORITY: Microsoft Offline Voices (good quality, offline)
+        // Look for "Microsoft" voices that are NOT "Online"
         if (!match) {
           match = voices.find(v => {
             const name = v.name.toLowerCase()
@@ -254,11 +265,52 @@ export const playBrowserTTS = async (text: string, voice: VoiceType, language: L
             const targetLang = langCode.split('-')[0].toLowerCase()
 
             return lang.startsWith(targetLang) &&
-              (name.includes("natural") || name.includes("google"))
+              name.includes("microsoft") &&
+              !name.includes("online") &&
+              lowerKeywords.some(k => name.includes(k))
           })
         }
 
-        // 3. Standard search: match language and keywords
+        // 3. Fallback to ANY Microsoft Edge Natural voice of correct language
+        if (!match) {
+          match = voices.find(v => {
+            const name = v.name.toLowerCase()
+            const lang = v.lang.toLowerCase()
+            const targetLang = langCode.split('-')[0].toLowerCase()
+
+            return lang.startsWith(targetLang) &&
+              name.includes("microsoft") &&
+              (name.includes("natural") || name.includes("online"))
+          })
+        }
+
+        // 4. Google voices (Chrome - also high quality)
+        if (!match) {
+          match = voices.find(v => {
+            const name = v.name.toLowerCase()
+            const lang = v.lang.toLowerCase()
+            const targetLang = langCode.split('-')[0].toLowerCase()
+
+            return lang.startsWith(targetLang) &&
+              name.includes("google") &&
+              lowerKeywords.some(k => name.includes(k))
+          })
+        }
+
+        // 5. Any Natural/Enhanced voice
+        if (!match) {
+          match = voices.find(v => {
+            const name = v.name.toLowerCase()
+            const lang = v.lang.toLowerCase()
+            const targetLang = langCode.split('-')[0].toLowerCase()
+
+            return lang.startsWith(targetLang) &&
+              (name.includes("natural") || name.includes("enhanced")) &&
+              lowerKeywords.some(k => name.includes(k))
+          })
+        }
+
+        // 6. Standard search: match language and keywords
         if (!match) {
           match = voices.find(v => {
             const name = v.name.toLowerCase()
@@ -270,11 +322,11 @@ export const playBrowserTTS = async (text: string, voice: VoiceType, language: L
           })
         }
 
-        // 4. If no specific match, try to find any voice of the correct gender for the language
+        // 7. If no specific match, try to find any voice of the correct gender for the language
         if (!match) {
           // Common identifiers for gender in voice names
-          const maleIdentifiers = ['male', 'david', 'james', 'daniel', 'mark', 'george', 'guy']
-          const femaleIdentifiers = ['female', 'zira', 'samantha', 'susan', 'hazel', 'heather', 'jenny', 'aria']
+          const maleIdentifiers = ['male', 'david', 'james', 'daniel', 'mark', 'george', 'guy', 'richard', 'paul']
+          const femaleIdentifiers = ['female', 'zira', 'samantha', 'susan', 'hazel', 'heather', 'jenny', 'aria', 'linda', 'sarah']
 
           const targetIdentifiers = gender === 'male' ? maleIdentifiers : femaleIdentifiers
 
@@ -527,6 +579,13 @@ export const playAnnouncement = async (
   const selectedLanguage = language || settings.defaultLanguage
   const timesToRepeat = repeatCount ?? settings.defaultRepeatCount ?? 1
 
+  // In Electron, use offline voice service
+  if (isElectron()) {
+    console.log(`[Electron] Playing announcement ${timesToRepeat} time(s) with offline voice`)
+    return playTextToSpeechOffline(text, selectedVoice, selectedLanguage, timesToRepeat)
+  }
+
+  // In browser, use fallback handler
   console.log(`[v0] Playing announcement ${timesToRepeat} time(s)`)
 
   let allSuccessful = true

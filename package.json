@@ -3,17 +3,104 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
     "dev": "next dev",
-    "lint": "eslint .",
-    "start": "next start",
+    "build": "next build",
     "export": "next build && next export",
-    "serve": "npx serve@latest out"
+    "start": "next start",
+    "serve": "npx serve@latest out",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "electron": "electron .",
+    "electron:dev": "set NODE_ENV=development&& electron .",
+    "electron:build": "npm run export && electron-builder",
+    "electron:build:win": "npm run export && electron-builder --win",
+    "electron:build:mac": "npm run export && electron-builder --mac",
+    "electron:build:linux": "npm run export && electron-builder --linux",
+    "setup-voices": "node scripts/setup-voices.js"
+  },
+  "build": {
+    "appId": "com.ghana.schoolbell",
+    "productName": "Ghana School Bell System",
+    "files": [
+      "out/**/*",
+      "main.js",
+      "preload.js",
+      "electron/**/*",
+      "!node_modules/**/*",
+      "node_modules/electron-store/**/*"
+    ],
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "extraResources": [
+      {
+        "from": "electron/voices",
+        "to": "voices",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "publisherName": "Ghana School Bell System"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ghana School Bell"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.education"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Education"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "your-github-username",
+      "repo": "ghana-school-bell"
+    }
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
-    "idb": "^8.0.0",
-    "workbox-window": "^7.0.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -47,7 +134,10 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
+    "electron-store": "^11.0.2",
     "embla-carousel-react": "8.5.1",
+    "idb": "^8.0.0",
+    "idb-keyval": "^6.2.1",
     "immer": "latest",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
@@ -64,18 +154,28 @@
     "tailwindcss-animate": "^1.0.7",
     "use-sync-external-store": "latest",
     "vaul": "^1.1.2",
+    "workbox-window": "^7.0.0",
     "zod": "3.25.76",
     "zustand": "latest"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
-    "workbox-webpack-plugin": "^7.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^39.2.5",
+    "electron-builder": "^26.0.12",
+    "electron-serve": "^3.0.0",
+    "electron-updater": "^6.6.2",
+    "fast-check": "^4.3.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
+    "ts-jest": "^29.4.6",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "workbox-webpack-plugin": "^7.0.0"
   }
 }

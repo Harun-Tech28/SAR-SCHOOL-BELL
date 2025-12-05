@@ -3,6 +3,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { PWAInit } from "@/components/pwa-init"
+import { ElectronInit } from "@/components/electron-init"
 import { OfflineIndicator } from "@/components/offline-indicator"
 import "./globals.css"
 
@@ -78,6 +79,7 @@ export default function RootLayout({
       </head>
       <body className={`font-sans antialiased`}>
         <PWAInit />
+        <ElectronInit />
         <OfflineIndicator position="top" showWhenOnline={true} />
         {children}
         <Analytics />

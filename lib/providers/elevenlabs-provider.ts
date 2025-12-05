@@ -1,6 +1,7 @@
 import type { AIVoiceProvider, VoiceOptions, AIVoiceProfile } from "../ai-voice-types"
 import { AIVoiceError, RateLimitError, AuthenticationError, ServiceUnavailableError } from "../ai-voice-types"
 import { PROVIDER_COSTS } from "../ai-voice-constants"
+import { fetchWithTimeout } from "../utils"
 
 export class ElevenLabsProvider implements AIVoiceProvider {
   name = "ElevenLabs"
@@ -29,7 +30,7 @@ export class ElevenLabsProvider implements AIVoiceProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/text-to-speech/${voiceId}`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/text-to-speech/${voiceId}`, {
         method: "POST",
         headers: {
           "Accept": "audio/mpeg",
@@ -37,6 +38,7 @@ export class ElevenLabsProvider implements AIVoiceProvider {
           "xi-api-key": this.apiKey
         },
         body: JSON.stringify(requestBody)
+        , timeout: 5000
       })
 
       if (!response.ok) {
@@ -60,10 +62,11 @@ export class ElevenLabsProvider implements AIVoiceProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/voices`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/voices`, {
         headers: {
           "xi-api-key": this.apiKey
         }
+        , timeout: 5000
       })
 
       if (!response.ok) {
@@ -85,10 +88,11 @@ export class ElevenLabsProvider implements AIVoiceProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/user`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/user`, {
         headers: {
           "xi-api-key": this.apiKey
         }
+        , timeout: 5000
       })
 
       return response.ok
@@ -193,7 +197,7 @@ export class ElevenLabsProvider implements AIVoiceProvider {
   private detectCategory(labels: any): "standard" | "religious" | "announcement" | "bell" {
     const description = (labels.description || "").toLowerCase()
     const useCase = (labels.use_case || "").toLowerCase()
-    
+
     if (description.includes("announcement") || useCase.includes("announcement")) {
       return "announcement"
     }
@@ -228,7 +232,7 @@ export class ElevenLabsProvider implements AIVoiceProvider {
   private async handleErrorResponse(response: Response): Promise<never> {
     const errorText = await response.text()
     let errorData: any = {}
-    
+
     try {
       errorData = JSON.parse(errorText)
     } catch {
@@ -278,7 +282,7 @@ export class ElevenLabsProvider implements AIVoiceProvider {
   // Utility method to check if a language is supported
   isLanguageSupported(language: string): boolean {
     const supportedLanguages = [
-      "english", "spanish", "french", "german", "italian", "portuguese", 
+      "english", "spanish", "french", "german", "italian", "portuguese",
       "polish", "hindi", "arabic", "japanese", "korean", "chinese"
     ]
     return supportedLanguages.includes(language.toLowerCase())
@@ -312,10 +316,11 @@ export class ElevenLabsProvider implements AIVoiceProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/voices/${voiceId}/settings`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/voices/${voiceId}/settings`, {
         headers: {
           "xi-api-key": this.apiKey
         }
+        , timeout: 5000
       })
 
       if (!response.ok) {

@@ -51,10 +51,10 @@ export function registerServiceWorker(config: ServiceWorkerConfig = {}): void {
           });
         });
 
-        // Check for updates periodically (every hour)
+        // Check for updates periodically (every 4 hours to reduce interruptions)
         setInterval(() => {
           registration.update();
-        }, 60 * 60 * 1000);
+        }, 4 * 60 * 60 * 1000); // 4 hours instead of 1 hour
       })
       .catch((error) => {
         console.error('[SW] Service worker registration failed:', error);

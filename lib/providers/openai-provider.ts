@@ -1,6 +1,7 @@
 import type { AIVoiceProvider, VoiceOptions, AIVoiceProfile } from "../ai-voice-types"
 import { AIVoiceError, RateLimitError, AuthenticationError, ServiceUnavailableError } from "../ai-voice-types"
 import { PROVIDER_COSTS } from "../ai-voice-constants"
+import { fetchWithTimeout } from "../utils"
 
 export class OpenAIProvider implements AIVoiceProvider {
   name = "OpenAI TTS"
@@ -25,13 +26,14 @@ export class OpenAIProvider implements AIVoiceProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/audio/speech`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/audio/speech`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(requestBody)
+        , timeout: 5000
       })
 
       if (!response.ok) {
@@ -109,7 +111,7 @@ export class OpenAIProvider implements AIVoiceProvider {
 
     try {
       // Test with a minimal request
-      const response = await fetch(`${this.baseUrl}/audio/speech`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/audio/speech`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
@@ -120,7 +122,9 @@ export class OpenAIProvider implements AIVoiceProvider {
           input: "test",
           voice: "alloy",
           response_format: "mp3"
+          , timeout: 5000
         })
+        , timeout: 5000
       })
 
       return response.ok || response.status === 400 // 400 might be due to minimal input, but auth is valid
@@ -151,7 +155,7 @@ export class OpenAIProvider implements AIVoiceProvider {
   private async handleErrorResponse(response: Response): Promise<never> {
     const errorText = await response.text()
     let errorData: any = {}
-    
+
     try {
       errorData = JSON.parse(errorText)
     } catch {
@@ -202,7 +206,7 @@ export class OpenAIProvider implements AIVoiceProvider {
   isLanguageSupported(language: string): boolean {
     // OpenAI TTS supports many languages, but voices are primarily English
     const supportedLanguages = [
-      "english", "spanish", "french", "german", "italian", "portuguese", 
+      "english", "spanish", "french", "german", "italian", "portuguese",
       "russian", "japanese", "korean", "chinese", "arabic", "hindi", "dutch"
     ]
     return supportedLanguages.includes(language.toLowerCase())

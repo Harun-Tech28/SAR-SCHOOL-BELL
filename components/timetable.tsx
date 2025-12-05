@@ -130,9 +130,9 @@ export function Timetable() {
 
     // Validation
     if (!formData.name || !formData.bellTime) {
-      console.error("❌ Validation failed: Name or Bell Time missing")
-      console.error("Name:", formData.name)
-      console.error("Bell Time:", formData.bellTime)
+      console.warn("⚠️ Validation failed: Name or Bell Time missing")
+      console.warn("Name:", formData.name)
+      console.warn("Bell Time:", formData.bellTime)
       alert("Please fill in both Name and Time fields")
       return
     }

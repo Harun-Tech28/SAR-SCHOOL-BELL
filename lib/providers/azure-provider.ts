@@ -1,6 +1,7 @@
 import type { AIVoiceProvider, VoiceOptions, AIVoiceProfile } from "../ai-voice-types"
 import { AIVoiceError, RateLimitError, AuthenticationError, ServiceUnavailableError } from "../ai-voice-types"
 import { PROVIDER_COSTS } from "../ai-voice-constants"
+import { fetchWithTimeout } from "../utils"
 
 export class AzureProvider implements AIVoiceProvider {
   name = "Azure Cognitive Services"
@@ -10,7 +11,7 @@ export class AzureProvider implements AIVoiceProvider {
 
   constructor(apiKey: string, endpoint?: string) {
     this.apiKey = apiKey
-    
+
     // Extract region from endpoint or use default
     if (endpoint) {
       const match = endpoint.match(/https:\/\/([^.]+)\.tts\.speech\.microsoft\.com/)
@@ -29,12 +30,12 @@ export class AzureProvider implements AIVoiceProvider {
 
     // Get access token first
     const accessToken = await this.getAccessToken()
-    
+
     const voiceInfo = this.mapVoiceId(options.voice)
     const ssml = this.generateSSML(text, voiceInfo, options)
 
     try {
-      const response = await fetch(`${this.baseUrl}/cognitiveservices/v1`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/cognitiveservices/v1`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
@@ -43,6 +44,7 @@ export class AzureProvider implements AIVoiceProvider {
           "User-Agent": "SchoolBellSystem"
         },
         body: ssml
+        , timeout: 5000
       })
 
       if (!response.ok) {
@@ -66,10 +68,11 @@ export class AzureProvider implements AIVoiceProvider {
 
     try {
       const accessToken = await this.getAccessToken()
-      const response = await fetch(`${this.baseUrl}/cognitiveservices/voices/list`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/cognitiveservices/voices/list`, {
         headers: {
           "Authorization": `Bearer ${accessToken}`
         }
+        , timeout: 5000
       })
 
       if (!response.ok) {
@@ -103,9 +106,9 @@ export class AzureProvider implements AIVoiceProvider {
 
   private async getAccessToken(): Promise<string> {
     const tokenUrl = `https://${this.region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`
-    
+
     try {
-      const response = await fetch(tokenUrl, {
+      const response = await fetchWithTimeout(tokenUrl, {
         method: "POST",
         headers: {
           "Ocp-Apim-Subscription-Key": this.apiKey,
@@ -133,7 +136,7 @@ export class AzureProvider implements AIVoiceProvider {
   private generateSSML(text: string, voiceInfo: any, options: VoiceOptions): string {
     const rate = this.mapSpeedToRate(options.speed)
     const pitch = this.mapPitchToSSML(options.pitch)
-    
+
     return `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${voiceInfo.locale}">
         <voice name="${voiceInfo.name}">
@@ -267,7 +270,7 @@ export class AzureProvider implements AIVoiceProvider {
       "nl-NL": "dutch",
       "sv-SE": "swedish"
     }
-    
+
     return languageMap[locale] || "english"
   }
 
@@ -281,7 +284,7 @@ export class AzureProvider implements AIVoiceProvider {
 
   private categorizeVoice(styleList: string[]): "standard" | "religious" | "announcement" | "bell" {
     const styles = styleList.join(" ").toLowerCase()
-    
+
     if (styles.includes("newscast") || styles.includes("announcement")) {
       return "announcement"
     }
@@ -308,7 +311,7 @@ export class AzureProvider implements AIVoiceProvider {
   private async handleErrorResponse(response: Response): Promise<never> {
     const errorText = await response.text()
     let errorData: any = {}
-    
+
     try {
       errorData = JSON.parse(errorText)
     } catch {
@@ -359,8 +362,8 @@ export class AzureProvider implements AIVoiceProvider {
   // Utility method to check if a language is supported
   isLanguageSupported(language: string): boolean {
     const supportedLanguages = [
-      "english", "spanish", "french", "german", "italian", "portuguese", 
-      "russian", "japanese", "korean", "chinese", "arabic", "hindi", 
+      "english", "spanish", "french", "german", "italian", "portuguese",
+      "russian", "japanese", "korean", "chinese", "arabic", "hindi",
       "dutch", "swedish", "norwegian", "danish", "finnish"
     ]
     return supportedLanguages.includes(language.toLowerCase())
@@ -379,7 +382,7 @@ export class AzureProvider implements AIVoiceProvider {
   // Update API key and region
   updateCredentials(apiKey: string, endpoint?: string): void {
     this.apiKey = apiKey
-    
+
     if (endpoint) {
       const match = endpoint.match(/https:\/\/([^.]+)\.tts\.speech\.microsoft\.com/)
       this.region = match ? match[1] : "eastus"
@@ -415,7 +418,7 @@ export class AzureProvider implements AIVoiceProvider {
     const pitch = options?.pitch || "medium"
     const volume = options?.volume || "medium"
     const style = options?.style || "default"
-    
+
     return `
       <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
         <voice name="${voiceName}">

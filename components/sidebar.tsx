@@ -24,19 +24,6 @@ export function Sidebar({ currentPage, setCurrentPage }: SidebarProps) {
   return (
     <aside className="hidden lg:block w-64 bg-sidebar border-r border-sidebar-border p-6 overflow-y-auto">
       <div className="mb-8 text-center">
-        <div className="mb-4 flex justify-center">
-          <div className="w-24 h-24 bg-white rounded-full p-2 shadow-lg">
-            <img 
-              src="/sar-logo.png" 
-              alt="SAR Educational Complex" 
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                // Fallback if image doesn't load
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-          </div>
-        </div>
         <h1 className="text-xl font-bold text-sidebar-foreground">SAR Educational Complex</h1>
         <p className="text-sm text-sidebar-foreground/80 font-medium mt-1">Bell System</p>
         <p className="text-xs text-sidebar-foreground/60 mt-1 italic">Nurturing Minds And Hearts</p>

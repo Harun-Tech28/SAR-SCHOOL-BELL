@@ -168,10 +168,10 @@ const addMetallicShimmer = (audioContext: AudioContext, startTime: number, durat
  */
 const playGhanaHandBell = (audioContext: AudioContext): void => {
     const now = audioContext.currentTime
-    
+
     // Manual ringing pattern - slightly irregular timing like a real person
     const ringTimes = [0, 0.35, 0.68, 1.05, 1.38, 1.75]
-    
+
     ringTimes.forEach((time) => {
         playGhanaianBellStrike(audioContext, now + time, 0.4, 1.0)
     })
@@ -185,15 +185,15 @@ const playGhanaAssemblyBell = (audioContext: AudioContext): void => {
     const now = audioContext.currentTime
     const strikeCount = 15
     const baseInterval = 0.28
-    
+
     for (let i = 0; i < strikeCount; i++) {
         // Add slight variation to timing (human factor)
         const variation = (Math.random() - 0.5) * 0.05
         const strikeTime = now + (i * baseInterval) + variation
-        
+
         // Vary intensity slightly
         const intensity = 0.9 + (Math.random() * 0.2)
-        
+
         playGhanaianBellStrike(audioContext, strikeTime, 0.35, intensity)
     }
 }
@@ -204,10 +204,10 @@ const playGhanaAssemblyBell = (audioContext: AudioContext): void => {
  */
 const playGhanaBreakBell = (audioContext: AudioContext): void => {
     const now = audioContext.currentTime
-    
+
     // Quick burst pattern
     const ringTimes = [0, 0.3, 0.58, 0.88]
-    
+
     ringTimes.forEach((time) => {
         playGhanaianBellStrike(audioContext, now + time, 0.38, 1.0)
     })
@@ -225,10 +225,10 @@ const playGhanaianBellStrike = (
 ): void => {
     // Ghanaian school bells have a distinctive metallic clang
     // Multiple inharmonic frequencies create the "clang" sound
-    
+
     // Ensure startTime is never negative
     const safeStartTime = Math.max(startTime, audioContext.currentTime)
-    
+
     // Fundamental and overtones (slightly detuned for realism)
     const frequencies = [
         850,   // Fundamental
@@ -240,60 +240,60 @@ const playGhanaianBellStrike = (
         6800,  // High overtone
         8500   // Very high overtone
     ]
-    
+
     const gains = [0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0.08, 0.05]
-    
+
     frequencies.forEach((freq, index) => {
         const oscillator = audioContext.createOscillator()
         const gainNode = audioContext.createGain()
-        
+
         // Use triangle wave for metallic quality
         oscillator.type = 'triangle'
         oscillator.frequency.setValueAtTime(freq, safeStartTime)
-        
+
         // Sharp attack, quick decay (characteristic of metal bell)
         const adjustedGain = gains[index] * intensity
         gainNode.gain.setValueAtTime(0.01, safeStartTime)
         gainNode.gain.exponentialRampToValueAtTime(adjustedGain, safeStartTime + 0.01) // Very fast attack
         gainNode.gain.exponentialRampToValueAtTime(adjustedGain * 0.3, safeStartTime + 0.08) // Quick initial decay
         gainNode.gain.exponentialRampToValueAtTime(0.01, safeStartTime + duration) // Long tail
-        
+
         oscillator.connect(gainNode)
         gainNode.connect(audioContext.destination)
-        
+
         oscillator.start(safeStartTime)
         oscillator.stop(safeStartTime + duration)
     })
-    
+
     // Add metallic "clang" noise component
     const bufferSize = audioContext.sampleRate * 0.05 // 50ms of noise
     const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate)
     const data = buffer.getChannelData(0)
-    
+
     // Generate metallic noise burst
     for (let i = 0; i < bufferSize; i++) {
         data[i] = (Math.random() * 2 - 1) * 0.3 * intensity
     }
-    
+
     const noise = audioContext.createBufferSource()
     const noiseFilter = audioContext.createBiquadFilter()
     const noiseGain = audioContext.createGain()
-    
+
     noise.buffer = buffer
-    
+
     // Band-pass filter for metallic character
     noiseFilter.type = 'bandpass'
-    noiseFilter.frequency.setValueAtTime(3000, startTime)
-    noiseFilter.Q.setValueAtTime(2, startTime)
-    
-    noiseGain.gain.setValueAtTime(0.4 * intensity, startTime)
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.05)
-    
+    noiseFilter.frequency.setValueAtTime(3000, safeStartTime)
+    noiseFilter.Q.setValueAtTime(2, safeStartTime)
+
+    noiseGain.gain.setValueAtTime(0.4 * intensity, safeStartTime)
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, safeStartTime + 0.05)
+
     noise.connect(noiseFilter)
     noiseFilter.connect(noiseGain)
     noiseGain.connect(audioContext.destination)
-    
-    noise.start(startTime)
+
+    noise.start(safeStartTime)
 }
 
 /**

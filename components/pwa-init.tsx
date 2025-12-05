@@ -16,35 +16,49 @@ export function PWAInit() {
       console.error("Failed to initialize storage:", error);
     });
 
-    // Register service worker
+    // TEMPORARILY DISABLE SERVICE WORKER TO PREVENT AUTO-RELOADS
+    // This is causing the page to reload and delete timetables
+    console.log("⚠️ Service Worker DISABLED to prevent auto-reloads");
+    console.log("⚠️ Offline features temporarily unavailable");
+    
+    // Unregister any existing service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister().then((success) => {
+            if (success) {
+              console.log("✅ Unregistered service worker to prevent reloads");
+            }
+          });
+        }
+      });
+    }
+    
+    // TODO: Re-enable service worker after fixing reload issues
+    // Uncomment the code below when ready:
+    /*
     registerServiceWorker({
       onSuccess: () => {
         console.log("✅ App is ready for offline use");
       },
       onUpdate: () => {
-        toast.info("New version available!", {
-          description: "Refresh to update the app",
-          action: {
-            label: "Refresh",
-            onClick: () => window.location.reload(),
-          },
-          duration: 10000,
+        console.log("ℹ️ New version available. Refresh the page when convenient to update.");
+        toast.info("Update available", {
+          description: "A new version is available. Refresh when you're ready.",
+          duration: 5000,
         });
       },
       onOffline: () => {
-        toast.warning("You are offline", {
-          description: "Some features may be limited",
-        });
+        console.log("📴 You are offline");
       },
       onOnline: () => {
-        toast.success("Back online!", {
-          description: "All features are available",
-        });
+        console.log("📶 Back online");
       },
       onError: (error) => {
         console.error("Service worker registration failed:", error);
       },
     });
+    */
 
     // Listen for bell play events from service worker
     const handleBellPlay = (event: Event) => {

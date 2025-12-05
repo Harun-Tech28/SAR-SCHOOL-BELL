@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { persist, createJSONStorage } from "zustand/middleware"
 import type { AIVoiceSettings, AIVoiceProfile } from "./ai-voice-types"
 
 export type VoiceType =
@@ -114,6 +114,7 @@ interface SchoolStore {
 
 // Import storage sync functions
 import { syncTimetablesToDB, syncStudentsToDB } from "./pwa/zustand-storage-adapter"
+import { createStorageAdapter } from "./electron-storage-adapter"
 
 export const useStore = create<SchoolStore>()(
   persist(
@@ -265,14 +266,28 @@ export const useStore = create<SchoolStore>()(
     }),
     {
       name: "school-bell-storage",
-      onRehydrateStorage: () => (state) => {
-        console.log("🔄 Store rehydrated from localStorage")
-        if (state) {
-          console.log("📊 Rehydrated state:", {
-            studentsCount: state.students.length,
-            timetablesCount: state.timetables.length,
-            devicesCount: state.devices.length,
-          })
+      storage: createJSONStorage(() => createStorageAdapter("school-bell-storage")),
+      // Persist everything by default
+      partialize: (state) => state,
+      // Add version for migration support
+      version: 1,
+      onRehydrateStorage: () => {
+        console.log("🔄 Store rehydration started")
+        return (state, error) => {
+          if (error) {
+            console.error("❌ Store rehydration FAILED:", error)
+            alert("Failed to load saved data. Your previous settings may be lost.")
+          } else if (state) {
+            console.log("✅ Store rehydrated successfully")
+            console.log("📊 Rehydrated state:", {
+              studentsCount: state.students.length,
+              timetablesCount: state.timetables.length,
+              devicesCount: state.devices.length,
+              settingsPresent: !!state.settings,
+            })
+          } else {
+            console.warn("⚠️ Store rehydrated but state is null/undefined")
+          }
         }
       },
     },
