@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Upload, Trash2, Play, Pause, Music } from "lucide-react"
 import { audioStorage, type AudioMetadata } from "@/lib/audio-storage"
 
