@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "export": "next build && next export",
+    "export": "next build",
     "start": "next start",
     "serve": "npx serve@latest out",
     "test": "jest",
@@ -13,10 +13,10 @@
     "test:coverage": "jest --coverage",
     "electron": "electron .",
     "electron:dev": "set NODE_ENV=development&& electron .",
-    "electron:build": "npm run export && electron-builder",
-    "electron:build:win": "npm run export && electron-builder --win",
-    "electron:build:mac": "npm run export && electron-builder --mac",
-    "electron:build:linux": "npm run export && electron-builder --linux",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux",
     "setup-voices": "node scripts/setup-voices.js"
   },
   "build": {
@@ -52,8 +52,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
-      "publisherName": "Ghana School Bell System"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
