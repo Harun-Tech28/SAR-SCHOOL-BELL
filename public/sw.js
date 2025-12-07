@@ -181,13 +181,75 @@ function openDB() {
     });
 }
 
+// Background sync for scheduled bells
 self.addEventListener('periodicsync', (event) => {
     if (event.tag === 'bell-schedule') {
-        event.waitUntil(checkScheduleAndNotify());
+        event.waitUntil(checkScheduleAndPlayBell());
     }
 });
 
-async function checkScheduleAndNotify() {
+// Message handler for scheduled bells from the app
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SCHEDULE_BELL') {
+        const { time, config } = event.data;
+        scheduleBellAlarm(time, config);
+    }
+});
+
+// Store scheduled bells
+let scheduledBells = [];
+
+function scheduleBellAlarm(time, config) {
+    const bellTime = new Date(time);
+    const now = new Date();
+    const delay = bellTime.getTime() - now.getTime();
+
+    if (delay > 0) {
+        scheduledBells.push({
+            time: bellTime,
+            config,
+            timeout: setTimeout(() => {
+                playBellInBackground(config);
+            }, delay)
+        });
+        console.log('[SW] Bell scheduled for', bellTime);
+    }
+}
+
+async function playBellInBackground(config) {
+    console.log('[SW] Playing bell in background');
+    
+    // Show notification
+    await self.registration.showNotification('School Bell', {
+        body: config.announcement || 'Bell is ringing',
+        icon: '/icon-192x192.svg',
+        badge: '/icon-192x192.svg',
+        tag: 'bell-notification',
+        requireInteraction: false,
+        silent: false, // Play default notification sound
+    });
+
+    // Try to wake up the app and play audio
+    const clients = await self.clients.matchAll({ 
+        includeUncontrolled: true,
+        type: 'window'
+    });
+
+    if (clients.length > 0) {
+        // App is open - send message to play audio
+        clients.forEach(client => {
+            client.postMessage({
+                type: 'PLAY_BELL',
+                payload: config
+            });
+        });
+    } else {
+        // App is closed - open it
+        await self.clients.openWindow('/');
+    }
+}
+
+async function checkScheduleAndPlayBell() {
     try {
         const db = await openDB();
         const transaction = db.transaction('timetables', 'readonly');
@@ -200,22 +262,16 @@ async function checkScheduleAndNotify() {
         });
 
         const now = new Date();
-        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-        const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' });
+        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                          now.getMinutes().toString().padStart(2, '0');
+        const currentDay = now.getDay(); // 0-6
 
         for (const tt of timetables) {
-            if (tt.bellTime === currentTime && (tt.day === 'Daily' || tt.day === currentDay)) {
-                // Notify all clients
-                const clients = await self.clients.matchAll({ includeUncontrolled: true });
-                for (const client of clients) {
-                    client.postMessage({
-                        type: 'PLAY_BELL',
-                        payload: tt
-                    });
-                }
+            if (tt.time === currentTime && tt.days && tt.days.includes(currentDay)) {
+                await playBellInBackground(tt);
             }
         }
     } catch (error) {
-        console.error('Background sync failed:', error);
+        console.error('[SW] Background sync failed:', error);
     }
 }

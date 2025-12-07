@@ -1,10 +1,11 @@
-import { playTaskAudio, playToneAndAnnouncement, CombinedAudioPlayer } from "./combined-audio"
+import { playToneAndAnnouncement } from "./combined-audio"
 import { playCustomAnnouncement } from "./high-quality-announcements"
 import { playBellSound } from "./bell-sounds"
 import { useStore } from "./store"
 import type { BellType } from "./bell-sounds"
 import type { VoiceType, Language } from "./store"
 import { playStoredAudio } from "./audio-storage"
+import { pwaScheduler, PWABackgroundScheduler } from "./pwa-background-scheduler"
 
 /**
  * COMPLETE BELL SYSTEM FOR SCHOOL
@@ -454,6 +455,80 @@ export class CompleteBellSystem {
     console.log(`• ${status.features.length} features supported`)
 
     console.log("=".repeat(60))
+  }
+
+  /**
+   * Schedule a bell to play at a specific time (PWA Background Support)
+   */
+  static scheduleBell(
+    time: Date,
+    bellName: string,
+    message: string,
+    options: BellSystemOptions = {}
+  ): string {
+    console.log(`[BellSystem] Scheduling bell for ${time.toISOString()}`);
+    
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      const electronAPI = (window as any).electronAPI;
+      electronAPI.scheduleAudio(time.toISOString(), {
+        bellName,
+        message,
+        ...options
+      });
+      return `electron_${Date.now()}`;
+    } else {
+      return pwaScheduler.scheduleBell(time, {
+        bellName,
+        message,
+        ...options
+      });
+    }
+  }
+
+  static cancelScheduledBell(id: string): boolean {
+    console.log(`[BellSystem] Cancelling bell ${id}`);
+    
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      const electronAPI = (window as any).electronAPI;
+      electronAPI.cancelAudio(id);
+      return true;
+    } else {
+      return pwaScheduler.cancelBell(id);
+    }
+  }
+
+  static async initializeBackgroundSupport(): Promise<boolean> {
+    console.log('[BellSystem] Initializing background support');
+    
+    const notificationGranted = await PWABackgroundScheduler.requestNotificationPermission();
+    if (!notificationGranted) {
+      console.warn('[BellSystem] Notification permission denied');
+    }
+
+    const syncRegistered = await PWABackgroundScheduler.registerPeriodicSync();
+    if (!syncRegistered) {
+      console.warn('[BellSystem] Periodic sync not supported');
+    }
+
+    return notificationGranted;
+  }
+
+  static getScheduledBells(): string[] {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      return [];
+    } else {
+      return pwaScheduler.getScheduledBells();
+    }
+  }
+
+  static clearAllScheduledBells(): void {
+    console.log('[BellSystem] Clearing all scheduled bells');
+    
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      // Electron version
+    } else {
+      pwaScheduler.clearAll();
+    }
   }
 }
 

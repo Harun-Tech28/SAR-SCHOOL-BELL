@@ -17,10 +17,15 @@ export function PWAInit() {
     });
 
     // Register service worker for offline support
-    // Fixed: Removed automatic page reloads that were causing data loss
     registerServiceWorker({
-      onSuccess: () => {
+      onSuccess: async () => {
         console.log("✅ App is ready for offline use");
+        // Initialize background bell support
+        const { CompleteBellSystem } = await import("@/lib/complete-bell-system");
+        const granted = await CompleteBellSystem.initializeBackgroundSupport();
+        if (granted) {
+          console.log("🔔 Background bells enabled");
+        }
       },
       onUpdate: () => {
         console.log("ℹ️ New version available. Refresh the page when convenient to update.");
