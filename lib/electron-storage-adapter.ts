@@ -10,10 +10,13 @@ import { isElectron } from './electron-utils';
 
 export class ElectronStorageAdapter implements StateStorage {
   private storeName: string;
+  private useElectronFS: boolean;
+  private saveTimeout: any = null;
 
   constructor(storeName: string = 'app-store') {
     this.storeName = storeName;
-    console.log('[ElectronStorage] Adapter initialized for:', storeName);
+    this.useElectronFS = isElectron();
+    console.log('[ElectronStorage] Adapter initialized for:', storeName, 'Using Electron FS:', this.useElectronFS);
   }
 
   getItem(name: string): string | null {
@@ -22,22 +25,38 @@ export class ElectronStorageAdapter implements StateStorage {
         return null;
       }
 
+      // In Electron, try to load from file system via IPC (synchronously on first load)
+      if (this.useElectronFS && (window as any).electronAPI) {
+        // Check localStorage first for immediate access
+        const localValue = window.localStorage.getItem(name);
+        if (localValue) {
+          console.log('[ElectronStorage] ✅ Loaded from localStorage, length:', localValue.length);
+          return localValue;
+        }
+
+        // If not in localStorage, try to load from file system
+        // This will be async, so we return null and let Zustand handle rehydration
+        (window as any).electronAPI.loadZustandState(name).then((result: any) => {
+          if (result.success && result.data) {
+            console.log('[ElectronStorage] ✅ Loaded from file system, length:', result.data.length);
+            // Store in localStorage for next time
+            window.localStorage.setItem(name, result.data);
+            // Trigger a storage event to notify Zustand
+            window.dispatchEvent(new StorageEvent('storage', {
+              key: name,
+              newValue: result.data,
+              url: window.location.href
+            }));
+          }
+        }).catch((error: any) => {
+          console.error('[ElectronStorage] Failed to load from file system:', error);
+        });
+      }
+
+      // Return localStorage value (or null if not found)
       const value = window.localStorage.getItem(name);
       if (value) {
         console.log('[ElectronStorage] ✅ Loaded data, length:', value.length);
-        
-        // Validate JSON before returning
-        try {
-          JSON.parse(value);
-          console.log('[ElectronStorage] ✅ Data is valid JSON');
-        } catch (parseError) {
-          console.error('[ElectronStorage] ❌ CORRUPTED DATA DETECTED! Clearing...');
-          console.error('[ElectronStorage] Parse error:', parseError);
-          // Clear corrupted data
-          window.localStorage.removeItem(name);
-          alert('⚠️ Corrupted data detected and cleared. Starting fresh.');
-          return null;
-        }
       }
       return value;
     } catch (error) {
@@ -53,20 +72,32 @@ export class ElectronStorageAdapter implements StateStorage {
         return;
       }
 
-      // Save to localStorage
+      // Save to localStorage immediately
       window.localStorage.setItem(name, value);
       console.log('[ElectronStorage] ✅ Saved to localStorage, length:', value.length);
 
-      // VERIFY the save worked by reading it back
-      const verification = window.localStorage.getItem(name);
-      if (verification === value) {
-        console.log('[ElectronStorage] ✅ VERIFIED: Data successfully persisted');
-      } else {
-        console.error('[ElectronStorage] ❌ VERIFICATION FAILED: Data not persisted correctly!');
-        console.error('[ElectronStorage] Expected length:', value.length, 'Got:', verification?.length || 0);
+      // In Electron, ALSO save to file system via IPC (debounced)
+      if (this.useElectronFS && (window as any).electronAPI) {
+        // Clear existing timeout
+        if (this.saveTimeout) {
+          clearTimeout(this.saveTimeout);
+        }
+
+        // Debounce file system writes
+        this.saveTimeout = setTimeout(() => {
+          (window as any).electronAPI.saveZustandState(name, value).then((result: any) => {
+            if (result.success) {
+              console.log('[ElectronStorage] ✅ Saved to file system');
+            } else {
+              console.error('[ElectronStorage] ❌ Failed to save to file system:', result.error);
+            }
+          }).catch((error: any) => {
+            console.error('[ElectronStorage] ❌ File system save error:', error);
+          });
+        }, 500); // Wait 500ms before writing to disk
       }
 
-      // Also log what we're saving for debugging
+      // Log what we're saving
       try {
         const parsed = JSON.parse(value);
         if (parsed.state) {
@@ -82,15 +113,6 @@ export class ElectronStorageAdapter implements StateStorage {
 
     } catch (error: any) {
       console.error('[ElectronStorage] ❌ FAILED to save:', error);
-
-      // Check if it's a quota error
-      if (error.name === 'QuotaExceededError' || error.code === 22) {
-        console.error('[ElectronStorage] ❌ Storage quota exceeded! Try clearing old data.');
-        alert('Storage is full! Please clear some browser data.');
-      } else {
-        // Show alert for other errors too
-        alert(`Failed to save data: ${error.message}. Your settings may not be saved!`);
-      }
     }
   }
 

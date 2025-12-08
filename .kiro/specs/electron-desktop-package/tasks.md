@@ -264,6 +264,8 @@
 
 
 - [ ] 12.3 Set up Linux packaging
+
+
   - Configure AppImage for universal Linux support
   - Configure .deb package for Debian/Ubuntu
   - Include all voice engines and dependencies

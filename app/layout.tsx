@@ -1,10 +1,7 @@
 import type React from "react"
 // ... existing code ...
 import type { Metadata, Viewport } from "next"
-import { PWAInit } from "@/components/pwa-init"
-import { AutoScheduleBells } from "@/components/auto-schedule-bells"
-import { ElectronInit } from "@/components/electron-init"
-import { OfflineIndicator } from "@/components/offline-indicator"
+import { AppInit } from "@/components/app-init"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -78,10 +75,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={`font-sans antialiased`}>
-        <PWAInit />
-        <ElectronInit />
-        <AutoScheduleBells />
-        <OfflineIndicator position="top" showWhenOnline={true} />
+        <AppInit />
         {children}
       </body>
     </html>

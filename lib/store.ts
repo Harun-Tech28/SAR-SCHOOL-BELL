@@ -69,6 +69,7 @@ export interface SystemSettings {
   defaultLanguage: Language
   defaultRepeatCount: number
   defaultBellRingsBeforeVoice: number // How many times to ring bell before voice plays
+  defaultBellSound: string // Default bell sound (e.g., "bell", "electronic-bell")
   azanEnabled: boolean
   prayerTimes?: {
     fajr: string
@@ -128,6 +129,7 @@ export const useStore = create<SchoolStore>()(
         defaultLanguage: "english",
         defaultRepeatCount: 1,
         defaultBellRingsBeforeVoice: 3, // Ring bell 3 times before voice
+        defaultBellSound: "bell",
         azanEnabled: false,
         prayerTimes: {
           fajr: "05:30",

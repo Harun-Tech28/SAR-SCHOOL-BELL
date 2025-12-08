@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -30,7 +30,8 @@
       "electron/**/*",
       "!node_modules/**/*",
       "node_modules/electron-store/**/*",
-      "node_modules/electron-serve/**/*"
+      "node_modules/electron-serve/**/*",
+      "build/**/*"
     ],
     "directories": {
       "output": "build-output",

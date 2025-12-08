@@ -42,3 +42,7 @@ next-env.d.ts
 **/public/worker-*.js.map
 
 dist-electron/
+build-output/
+dist/
+release/
+

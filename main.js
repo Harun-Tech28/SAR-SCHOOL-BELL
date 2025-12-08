@@ -22,10 +22,14 @@ const audioScheduler = getAudioScheduler();
 let audioPlayer = null;
 
 // Serve static files in production
-let serve;
+let loadURL;
 if (process.env.NODE_ENV !== 'development') {
-    serve = require('electron-serve');
-    const loadURL = serve({ directory: 'out' });
+    let serve = require('electron-serve');
+    // Handle ESM default export if present
+    if (typeof serve !== 'function' && serve.default) {
+        serve = serve.default;
+    }
+    loadURL = serve({ directory: 'out' });
 }
 
 // Global references
@@ -62,8 +66,11 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         icon: path.join(__dirname, 'build/icon.png'),
-        show: false // Don't show until ready
+        show: true // Force show immediately for debugging
     });
+
+    // Force Open DevTools even in production for debugging
+    mainWindow.webContents.openDevTools();
 
     // Show window when ready
     mainWindow.once('ready-to-show', () => {
@@ -95,10 +102,20 @@ function createWindow() {
     });
 
     mainWindow.on('close', (event) => {
-        // On macOS, keep app running in background
-        if (process.platform === 'darwin' && !app.isQuitting) {
+        // Keep app running in background on ALL platforms (not just macOS)
+        // This allows bells to play even when the window is closed
+        if (!app.isQuitting && store.get('runInBackground', true)) {
             event.preventDefault();
             mainWindow.hide();
+
+            // Show notification that app is running in background
+            if (Notification.isSupported()) {
+                new Notification({
+                    title: 'Ghana School Bell',
+                    body: 'App is running in the background. Bells will continue to play on schedule.',
+                    icon: path.join(__dirname, 'build/icon.png')
+                }).show();
+            }
         }
     });
 
@@ -107,7 +124,6 @@ function createWindow() {
         mainWindow.loadURL('http://localhost:3000');
         mainWindow.webContents.openDevTools();
     } else {
-        const loadURL = require('electron-serve')({ directory: 'out' });
         loadURL(mainWindow);
     }
 
@@ -218,41 +234,101 @@ function createTray() {
     const trayIcon = nativeImage.createFromPath(iconPath);
 
     tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
-    tray.setToolTip('Ghana School Bell System');
 
-    // Create tray menu
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: 'Show App',
-            click: () => {
-                mainWindow.show();
-            }
-        },
-        {
-            label: 'Hide App',
-            click: () => {
-                mainWindow.hide();
-            }
-        },
-        { type: 'separator' },
-        {
-            label: 'Upcoming Bells',
-            click: () => {
-                mainWindow.show();
-                mainWindow.webContents.send('navigate-to', '/schedule');
-            }
-        },
-        { type: 'separator' },
-        {
-            label: 'Quit',
-            click: () => {
-                app.isQuitting = true;
-                app.quit();
-            }
+    // Update tray tooltip with next scheduled bell
+    const updateTrayTooltip = () => {
+        const scheduled = audioScheduler.getUpcomingSchedules();
+        if (scheduled.length > 0) {
+            const next = scheduled[0];
+            const time = new Date(next.time).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            tray.setToolTip(`Ghana School Bell System\nNext bell: ${next.config?.title || 'Scheduled'} at ${time}`);
+        } else {
+            tray.setToolTip('Ghana School Bell System\nNo bells scheduled');
         }
-    ]);
+    };
 
-    tray.setContextMenu(contextMenu);
+    updateTrayTooltip();
+    // Update tooltip every minute
+    setInterval(updateTrayTooltip, 60000);
+
+    // Function to rebuild menu (for checkbox state updates)
+    const rebuildTrayMenu = () => {
+        const runInBackground = store.get('runInBackground', true);
+        const autoStart = store.get('autoStart', false);
+        const scheduled = audioScheduler.getUpcomingSchedules();
+
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: '🔔 Ghana School Bell',
+                enabled: false
+            },
+            { type: 'separator' },
+            {
+                label: 'Show App',
+                click: () => {
+                    mainWindow.show();
+                }
+            },
+            {
+                label: 'Hide App',
+                click: () => {
+                    mainWindow.hide();
+                }
+            },
+            { type: 'separator' },
+            {
+                label: `📅 ${scheduled.length} Bell(s) Scheduled`,
+                enabled: false
+            },
+            {
+                label: 'View Upcoming Bells',
+                click: () => {
+                    mainWindow.show();
+                    mainWindow.webContents.send('navigate-to', '/schedule');
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Run in Background',
+                type: 'checkbox',
+                checked: runInBackground,
+                click: () => {
+                    const newValue = !store.get('runInBackground', true);
+                    store.set('runInBackground', newValue);
+                    rebuildTrayMenu();
+                }
+            },
+            {
+                label: 'Start with Windows',
+                type: 'checkbox',
+                checked: autoStart,
+                click: () => {
+                    const newValue = !store.get('autoStart', false);
+                    store.set('autoStart', newValue);
+                    app.setLoginItemSettings({
+                        openAtLogin: newValue,
+                        openAsHidden: newValue
+                    });
+                    rebuildTrayMenu();
+                }
+            },
+            { type: 'separator' },
+            {
+                label: 'Quit App',
+                click: () => {
+                    app.isQuitting = true;
+                    app.quit();
+                }
+            }
+        ]);
+
+        tray.setContextMenu(contextMenu);
+    };
+
+    rebuildTrayMenu();
 
     // Handle tray click
     tray.on('click', () => {
@@ -305,6 +381,38 @@ ipcMain.handle('import-data', async (event, importPath) => {
 // Storage statistics
 ipcMain.handle('get-storage-stats', async () => {
     return await storageManager.getStorageStats();
+});
+
+// Zustand store persistence
+ipcMain.handle('save-zustand-state', async (event, key, value) => {
+    try {
+        const fs = require('fs');
+        const filePath = path.join(dataPath, `${key}.json`);
+        await fs.promises.writeFile(filePath, value, 'utf8');
+        console.log('[Storage] Zustand state saved:', key);
+        return { success: true };
+    } catch (error) {
+        console.error('[Storage] Failed to save Zustand state:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('load-zustand-state', async (event, key) => {
+    try {
+        const fs = require('fs');
+        const filePath = path.join(dataPath, `${key}.json`);
+        
+        if (!fs.existsSync(filePath)) {
+            return { success: true, data: null };
+        }
+        
+        const data = await fs.promises.readFile(filePath, 'utf8');
+        console.log('[Storage] Zustand state loaded:', key);
+        return { success: true, data };
+    } catch (error) {
+        console.error('[Storage] Failed to load Zustand state:', error);
+        return { success: false, error: error.message };
+    }
 });
 
 // System operations
@@ -501,6 +609,23 @@ ipcMain.handle('get-default-audio-device', async () => {
     }
 });
 
+// Background mode settings
+ipcMain.handle('get-run-in-background', () => {
+    const enabled = store.get('runInBackground', true);
+    return { success: true, enabled };
+});
+
+ipcMain.handle('set-run-in-background', async (event, enabled) => {
+    try {
+        store.set('runInBackground', enabled);
+        console.log('[Background] Run in background', enabled ? 'enabled' : 'disabled');
+        return { success: true, enabled };
+    } catch (error) {
+        console.error('[Background] Failed to set run in background:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // App lifecycle
 app.whenReady().then(async () => {
     await initStore();
@@ -517,9 +642,13 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
+    // Don't quit when running in background mode
+    // The app continues running in the system tray
+    const runInBackground = store ? store.get('runInBackground', true) : true;
+    if (!runInBackground) {
         app.quit();
     }
+    // If running in background, do nothing - app stays in tray
 });
 
 app.on('activate', () => {

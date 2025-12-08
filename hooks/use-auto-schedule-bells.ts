@@ -26,7 +26,7 @@ export function useAutoScheduleBells() {
     timetables.forEach((timetable) => {
       // Calculate next occurrence of this bell
       const nextTime = getNextOccurrence(timetable.bellTime, timetable.day)
-      
+
       if (!nextTime) return
 
       // Schedule the bell
@@ -51,17 +51,32 @@ export function useAutoScheduleBells() {
 /**
  * Get next occurrence of a scheduled time
  */
-function getNextOccurrence(time: string, days: number[]): Date | null {
-  if (!time || !days || days.length === 0) return null
+function getNextOccurrence(time: string, day: string): Date | null {
+  if (!time || !day) return null
 
   const now = new Date()
   const [hours, minutes] = time.split(':').map(Number)
+
+  // Convert day string to day numbers (0-6)
+  const daysMap: Record<string, number> = {
+    'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+    'Thursday': 4, 'Friday': 5, 'Saturday': 6
+  }
+
+  let targetDays: number[] = []
+  if (day === 'Daily') {
+    targetDays = [1, 2, 3, 4, 5] // Mon-Fri
+  } else if (daysMap[day] !== undefined) {
+    targetDays = [daysMap[day]]
+  } else {
+    return null
+  }
 
   // Try today first
   const today = new Date()
   today.setHours(hours, minutes, 0, 0)
 
-  if (today > now && days.includes(now.getDay())) {
+  if (today > now && targetDays.includes(today.getDay())) {
     return today
   }
 
@@ -71,7 +86,7 @@ function getNextOccurrence(time: string, days: number[]): Date | null {
     nextDay.setDate(now.getDate() + i)
     nextDay.setHours(hours, minutes, 0, 0)
 
-    if (days.includes(nextDay.getDay())) {
+    if (targetDays.includes(nextDay.getDay())) {
       return nextDay
     }
   }
