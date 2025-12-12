@@ -3,6 +3,8 @@
 
 import { StateStorage } from "zustand/middleware";
 import { storageManager, STORES } from "./storage-manager";
+import { indexedDBManager } from "../indexeddb-manager";
+import type { Timetable } from "../store";
 
 /**
  * Custom storage adapter that syncs with IndexedDB
@@ -60,21 +62,29 @@ export const pwaStorageAdapter: StateStorage = {
 };
 
 /**
- * Sync timetables to IndexedDB
+ * Sync timetables to IndexedDB (using new IndexedDB manager)
+ * This makes timetables accessible to Service Worker for background bells
  */
-export async function syncTimetablesToDB(timetables: any[]): Promise<void> {
+export async function syncTimetablesToDB(timetables: Timetable[]): Promise<void> {
   try {
-    // Clear existing timetables
-    await storageManager.clearStore("TIMETABLE");
-
-    // Save each timetable
-    for (const timetable of timetables) {
-      await storageManager.saveToIndexedDB("TIMETABLE", timetable.id, timetable);
+    console.log('[Storage Sync] Syncing timetables to IndexedDB for Service Worker access...');
+    
+    // Use the new IndexedDB manager that Service Worker can also access
+    await indexedDBManager.syncAllTimetables(timetables);
+    
+    console.log(`[Storage Sync] ✅ Synced ${timetables.length} timetables to IndexedDB`);
+    
+    // Notify Service Worker to reload schedules
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'RELOAD_SCHEDULES',
+        timestamp: Date.now()
+      });
+      console.log('[Storage Sync] Notified Service Worker to reload schedules');
     }
-
-    console.log(`[Storage Sync] Synced ${timetables.length} timetables to IndexedDB`);
   } catch (error) {
     console.error("[Storage Sync] Failed to sync timetables:", error);
+    throw error; // Re-throw so caller knows it failed
   }
 }
 

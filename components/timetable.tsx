@@ -19,6 +19,7 @@ export function Timetable() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [availableAudios, setAvailableAudios] = useState<AudioMetadata[]>([])
+  const [hasHydrated, setHasHydrated] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     day: "Monday",
@@ -28,6 +29,27 @@ export function Timetable() {
     customMessage: "",
     customAudioId: "",
   })
+
+  // Wait for store to hydrate before showing timetables
+  useEffect(() => {
+    console.log("🔄 Timetable component mounted")
+    console.log("📊 Initial timetables count:", timetables.length)
+    
+    // Check if store has been hydrated
+    const checkHydration = () => {
+      if (useStore.persist.hasHydrated()) {
+        console.log("✅ Store already hydrated")
+        console.log("📊 Timetables after hydration:", useStore.getState().timetables.length)
+        setHasHydrated(true)
+      } else {
+        console.log("⏳ Waiting for store hydration...")
+        // Wait a bit and check again
+        setTimeout(checkHydration, 50)
+      }
+    }
+    
+    checkHydration()
+  }, [])
 
   // Load available audio files
   useEffect(() => {
@@ -138,6 +160,10 @@ export function Timetable() {
     }
 
     try {
+      // Get current state before save
+      const beforeCount = useStore.getState().timetables.length
+      console.log("📊 Timetables before save:", beforeCount)
+
       if (editingId) {
         console.log("📝 Updating existing timetable:", editingId)
         updateTimetable(editingId, formData)
@@ -151,8 +177,37 @@ export function Timetable() {
         console.log("➕ Adding new timetable:", newTimetable)
         addTimetable(newTimetable)
         console.log("✅ Add completed")
-        console.log("Current timetables count:", timetables.length + 1)
       }
+
+      // Verify save worked by checking state after a brief delay
+      setTimeout(() => {
+        const afterCount = useStore.getState().timetables.length
+        console.log("📊 Timetables after save:", afterCount)
+        
+        if (editingId) {
+          // For updates, count should be the same
+          if (afterCount === beforeCount) {
+            console.log("✅ Update verified in store")
+          } else {
+            console.error("❌ Update verification failed - count changed unexpectedly")
+          }
+        } else {
+          // For new additions, count should increase by 1
+          if (afterCount === beforeCount + 1) {
+            console.log("✅ Save verified in store")
+            // Dispatch success event
+            window.dispatchEvent(new CustomEvent('storage-warning', {
+              detail: { 
+                message: 'Timetable saved successfully!',
+                type: 'success'
+              }
+            }));
+          } else {
+            console.error("❌ Save verification failed - expected", beforeCount + 1, "got", afterCount)
+            alert("Warning: Save may have failed. Please check if your timetable appears in the list.")
+          }
+        }
+      }, 100)
 
       // Reset form
       setFormData({
@@ -166,9 +221,14 @@ export function Timetable() {
       })
       setShowForm(false)
       console.log("=== TIMETABLE FORM SUBMISSION END ===")
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Error saving timetable:", error)
-      alert("Failed to save timetable. Please try again.")
+      console.error("❌ Error details:", {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      })
+      alert(`Failed to save timetable. Error: ${error?.message || 'Unknown error'}. Check console for details.`)
     }
   }
 
@@ -203,6 +263,26 @@ export function Timetable() {
     setShowForm(false)
   }
 
+  // Show loading state while store is hydrating
+  if (!hasHydrated) {
+    return (
+      <div className="p-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-foreground mb-2">Timetables</h1>
+          <p className="text-foreground/60">Loading your bell schedules...</p>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center text-foreground/60">
+            <div className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-foreground"></div>
+              <span>Loading timetables...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="p-8">
       <div className="mb-8 flex justify-between items-center">
@@ -211,6 +291,23 @@ export function Timetable() {
           <p className="text-foreground/60">Manage bell schedules and announcements</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              // Debug: Check store state
+              const state = useStore.getState()
+              console.log("=== TIMETABLE DEBUG ===")
+              console.log("Timetables in store:", state.timetables)
+              console.log("Count:", state.timetables.length)
+              console.log("localStorage:", localStorage.getItem('school-bell-storage'))
+              alert(`Timetables in store: ${state.timetables.length}\nCheck console for details.`)
+            }}
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            title="Debug: Check store state"
+          >
+            Debug ({timetables.length})
+          </Button>
           <Button
             onClick={async () => {
               // Test the complete bell system

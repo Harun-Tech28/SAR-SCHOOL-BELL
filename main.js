@@ -1,673 +1,360 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, Notification, dialog } = require('electron');
+// Determine dev mode - force production since we're using packaged build
+const isDev = false;
 const path = require('path');
-const fs = require('fs').promises;
-let store;
+const fs = require('fs');
+const Store = require('electron-store');
 
-const { getStorageManager } = require('./electron/storage-manager');
-const { getAudioScheduler } = require('./electron/audio-scheduler');
-const { getAudioPlayer } = require('./electron/audio-player');
+// Initialize store with app-data in app directory
+const store = new Store({
+  cwd: path.join(app.getPath('userData'), 'GhanaBell')
+});
 
-async function initStore() {
-    const { default: Store } = await import('electron-store');
-    store = new Store();
-}
+let mainWindow;
+let tray;
 
-// Initialize storage manager
-const storageManager = getStorageManager();
+// Get app data directory
+const getAppDataPath = () => {
+  return path.join(app.getPath('userData'), 'GhanaBell');
+};
 
-// Initialize audio scheduler
-const audioScheduler = getAudioScheduler();
-
-// Audio player will be initialized after window is created
-let audioPlayer = null;
-
-// Serve static files in production
-let loadURL;
-if (process.env.NODE_ENV !== 'development') {
-    let serve = require('electron-serve');
-    // Handle ESM default export if present
-    if (typeof serve !== 'function' && serve.default) {
-        serve = serve.default;
-    }
-    loadURL = serve({ directory: 'out' });
-}
-
-// Global references
-let mainWindow = null;
-let tray = null;
-
-// Get user data path
-const userDataPath = app.getPath('userData');
-const dataPath = path.join(userDataPath, 'data');
-
-// Ensure data directory exists
-async function ensureDataDirectory() {
-    try {
-        await fs.mkdir(dataPath, { recursive: true });
-    } catch (error) {
-        console.error('Failed to create data directory:', error);
-    }
-}
+// Ensure app data directory exists
+const ensureAppDataDir = () => {
+  const dataPath = getAppDataPath();
+  if (!fs.existsSync(dataPath)) {
+    fs.mkdirSync(dataPath, { recursive: true });
+  }
+  return dataPath;
+};
 
 function createWindow() {
-    // Get saved window bounds or use defaults
-    const windowBounds = store.get('windowBounds', {
-        width: 1280,
-        height: 800
-    });
+  // Create the browser window
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      sandbox: true
+    },
+    icon: path.join(__dirname, 'assets/icon.png')
+  });
 
-    mainWindow = new BrowserWindow({
-        ...windowBounds,
-        minWidth: 800,
-        minHeight: 600,
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        },
-        icon: path.join(__dirname, 'build/icon.png'),
-        show: true // Force show immediately for debugging
-    });
+  // Load the app
+  const startURL = isDev
+    ? 'http://localhost:3000'
+    : `file://${path.join(__dirname, 'out', 'index.html')}`;
 
-    // Force Open DevTools even in production for debugging
+  mainWindow.loadURL(startURL);
+
+  // Open DevTools in development
+  if (isDev) {
     mainWindow.webContents.openDevTools();
+  }
 
-    // Show window when ready
-    mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
+  // Handle window closed
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 
-        // Initialize audio player with window reference
-        audioPlayer = getAudioPlayer(mainWindow);
-    });
-
-    // Save window bounds on resize/move
-    mainWindow.on('resize', () => {
-        if (!mainWindow.isMaximized() && !mainWindow.isMinimized()) {
-            store.set('windowBounds', mainWindow.getBounds());
-        }
-    });
-
-    mainWindow.on('move', () => {
-        if (!mainWindow.isMaximized() && !mainWindow.isMinimized()) {
-            store.set('windowBounds', mainWindow.getBounds());
-        }
-    });
-
-    // Handle minimize to tray
-    mainWindow.on('minimize', (event) => {
-        if (store.get('minimizeToTray', true)) {
-            event.preventDefault();
-            mainWindow.hide();
-        }
-    });
-
-    mainWindow.on('close', (event) => {
-        // Keep app running in background on ALL platforms (not just macOS)
-        // This allows bells to play even when the window is closed
-        if (!app.isQuitting && store.get('runInBackground', true)) {
-            event.preventDefault();
-            mainWindow.hide();
-
-            // Show notification that app is running in background
-            if (Notification.isSupported()) {
-                new Notification({
-                    title: 'Ghana School Bell',
-                    body: 'App is running in the background. Bells will continue to play on schedule.',
-                    icon: path.join(__dirname, 'build/icon.png')
-                }).show();
-            }
-        }
-    });
-
-    // Load the app
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.loadURL('http://localhost:3000');
-        mainWindow.webContents.openDevTools();
-    } else {
-        loadURL(mainWindow);
-    }
-
-    // Create application menu
-    createApplicationMenu();
-}
-
-function createApplicationMenu() {
-    const template = [
-        {
-            label: 'File',
-            submenu: [
-                {
-                    label: 'Settings',
-                    accelerator: 'CmdOrCtrl+,',
-                    click: () => {
-                        mainWindow.webContents.send('navigate-to', '/settings');
-                    }
-                },
-                { type: 'separator' },
-                {
-                    label: 'Export Data',
-                    click: async () => {
-                        // Will be implemented in storage manager
-                        mainWindow.webContents.send('export-data-request');
-                    }
-                },
-                {
-                    label: 'Import Data',
-                    click: async () => {
-                        // Will be implemented in storage manager
-                        mainWindow.webContents.send('import-data-request');
-                    }
-                },
-                { type: 'separator' },
-                {
-                    label: 'Quit',
-                    accelerator: 'CmdOrCtrl+Q',
-                    click: () => {
-                        app.isQuitting = true;
-                        app.quit();
-                    }
-                }
-            ]
-        },
-        {
-            label: 'Edit',
-            submenu: [
-                { role: 'undo' },
-                { role: 'redo' },
-                { type: 'separator' },
-                { role: 'cut' },
-                { role: 'copy' },
-                { role: 'paste' },
-                { role: 'selectAll' }
-            ]
-        },
-        {
-            label: 'View',
-            submenu: [
-                { role: 'reload' },
-                { role: 'forceReload' },
-                { type: 'separator' },
-                { role: 'resetZoom' },
-                { role: 'zoomIn' },
-                { role: 'zoomOut' },
-                { type: 'separator' },
-                { role: 'togglefullscreen' }
-            ]
-        },
-        {
-            label: 'Help',
-            submenu: [
-                {
-                    label: 'About',
-                    click: () => {
-                        mainWindow.webContents.send('show-about');
-                    }
-                },
-                {
-                    label: 'Check for Updates',
-                    click: () => {
-                        // Will be implemented with electron-updater
-                        mainWindow.webContents.send('check-updates');
-                    }
-                }
-            ]
-        }
-    ];
-
-    // Add developer tools in development
-    if (process.env.NODE_ENV === 'development') {
-        template.push({
-            label: 'Developer',
-            submenu: [
-                { role: 'toggleDevTools' }
-            ]
-        });
-    }
-
-    const menu = Menu.buildFromTemplate(template);
-    Menu.setApplicationMenu(menu);
+  // Save window bounds
+  mainWindow.on('close', () => {
+    store.set('windowBounds', mainWindow.getBounds());
+  });
 }
 
 function createTray() {
-    // Create tray icon
-    const iconPath = path.join(__dirname, 'build/tray-icon.png');
-    const trayIcon = nativeImage.createFromPath(iconPath);
-
-    tray = new Tray(trayIcon.resize({ width: 16, height: 16 }));
-
-    // Update tray tooltip with next scheduled bell
-    const updateTrayTooltip = () => {
-        const scheduled = audioScheduler.getUpcomingSchedules();
-        if (scheduled.length > 0) {
-            const next = scheduled[0];
-            const time = new Date(next.time).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            tray.setToolTip(`Ghana School Bell System\nNext bell: ${next.config?.title || 'Scheduled'} at ${time}`);
-        } else {
-            tray.setToolTip('Ghana School Bell System\nNo bells scheduled');
-        }
-    };
-
-    updateTrayTooltip();
-    // Update tooltip every minute
-    setInterval(updateTrayTooltip, 60000);
-
-    // Function to rebuild menu (for checkbox state updates)
-    const rebuildTrayMenu = () => {
-        const runInBackground = store.get('runInBackground', true);
-        const autoStart = store.get('autoStart', false);
-        const scheduled = audioScheduler.getUpcomingSchedules();
-
-        const contextMenu = Menu.buildFromTemplate([
-            {
-                label: '🔔 Ghana School Bell',
-                enabled: false
-            },
-            { type: 'separator' },
-            {
-                label: 'Show App',
-                click: () => {
-                    mainWindow.show();
-                }
-            },
-            {
-                label: 'Hide App',
-                click: () => {
-                    mainWindow.hide();
-                }
-            },
-            { type: 'separator' },
-            {
-                label: `📅 ${scheduled.length} Bell(s) Scheduled`,
-                enabled: false
-            },
-            {
-                label: 'View Upcoming Bells',
-                click: () => {
-                    mainWindow.show();
-                    mainWindow.webContents.send('navigate-to', '/schedule');
-                }
-            },
-            { type: 'separator' },
-            {
-                label: 'Run in Background',
-                type: 'checkbox',
-                checked: runInBackground,
-                click: () => {
-                    const newValue = !store.get('runInBackground', true);
-                    store.set('runInBackground', newValue);
-                    rebuildTrayMenu();
-                }
-            },
-            {
-                label: 'Start with Windows',
-                type: 'checkbox',
-                checked: autoStart,
-                click: () => {
-                    const newValue = !store.get('autoStart', false);
-                    store.set('autoStart', newValue);
-                    app.setLoginItemSettings({
-                        openAtLogin: newValue,
-                        openAsHidden: newValue
-                    });
-                    rebuildTrayMenu();
-                }
-            },
-            { type: 'separator' },
-            {
-                label: 'Quit App',
-                click: () => {
-                    app.isQuitting = true;
-                    app.quit();
-                }
-            }
-        ]);
-
-        tray.setContextMenu(contextMenu);
-    };
-
-    rebuildTrayMenu();
-
-    // Handle tray click
-    tray.on('click', () => {
-        if (mainWindow.isVisible()) {
-            mainWindow.hide();
-        } else {
+  const iconPath = path.join(__dirname, 'assets/tray-icon.png');
+  
+  if (fs.existsSync(iconPath)) {
+    tray = new Tray(iconPath);
+    
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Show',
+        click: () => {
+          if (mainWindow) {
             mainWindow.show();
+          }
         }
+      },
+      {
+        label: 'Hide',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.hide();
+          }
+        }
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuitting = true;
+          app.quit();
+        }
+      }
+    ]);
+    
+    tray.setContextMenu(contextMenu);
+    
+    tray.on('click', () => {
+      if (mainWindow) {
+        mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+      }
     });
+  }
 }
 
-// IPC Handlers
-
-// Settings operations
-ipcMain.handle('save-settings', async (event, settings) => {
-    return await storageManager.saveSettings(settings);
-});
-
-ipcMain.handle('load-settings', async () => {
-    return await storageManager.loadSettings();
-});
-
-// Timetable operations
-ipcMain.handle('save-timetable', async (event, timetable) => {
-    return await storageManager.saveTimetable(timetable);
-});
-
-ipcMain.handle('load-timetable', async () => {
-    return await storageManager.loadTimetable();
-});
-
-// Student data operations
-ipcMain.handle('save-student-data', async (event, studentData) => {
-    return await storageManager.saveStudentData(studentData);
-});
-
-ipcMain.handle('load-student-data', async () => {
-    return await storageManager.loadStudentData();
-});
-
-// Data export/import operations
-ipcMain.handle('export-data', async (event, exportPath) => {
-    return await storageManager.exportData(exportPath);
-});
-
-ipcMain.handle('import-data', async (event, importPath) => {
-    return await storageManager.importData(importPath);
-});
-
-// Storage statistics
-ipcMain.handle('get-storage-stats', async () => {
-    return await storageManager.getStorageStats();
-});
-
-// Zustand store persistence
-ipcMain.handle('save-zustand-state', async (event, key, value) => {
-    try {
-        const fs = require('fs');
-        const filePath = path.join(dataPath, `${key}.json`);
-        await fs.promises.writeFile(filePath, value, 'utf8');
-        console.log('[Storage] Zustand state saved:', key);
-        return { success: true };
-    } catch (error) {
-        console.error('[Storage] Failed to save Zustand state:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('load-zustand-state', async (event, key) => {
-    try {
-        const fs = require('fs');
-        const filePath = path.join(dataPath, `${key}.json`);
-        
-        if (!fs.existsSync(filePath)) {
-            return { success: true, data: null };
-        }
-        
-        const data = await fs.promises.readFile(filePath, 'utf8');
-        console.log('[Storage] Zustand state loaded:', key);
-        return { success: true, data };
-    } catch (error) {
-        console.error('[Storage] Failed to load Zustand state:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// System operations
-ipcMain.on('minimize-to-tray', () => {
-    if (mainWindow) {
-        mainWindow.hide();
-    }
-});
-
-ipcMain.on('show-notification', (event, title, body) => {
-    if (Notification.isSupported()) {
-        new Notification({
-            title,
-            body,
-            icon: path.join(__dirname, 'build/icon.png')
-        }).show();
-    }
-});
-
-ipcMain.handle('get-data-path', () => {
-    return dataPath;
-});
-
-// Auto-start operations
-ipcMain.handle('set-auto-start', async (event, enabled) => {
-    try {
-        store.set('autoStart', enabled);
-        app.setLoginItemSettings({
-            openAtLogin: enabled,
-            openAsHidden: false
-        });
-        console.log('[AutoStart] Auto-start', enabled ? 'enabled' : 'disabled');
-        return { success: true, enabled };
-    } catch (error) {
-        console.error('[AutoStart] Failed to set auto-start:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('get-auto-start', () => {
-    const enabled = store.get('autoStart', false);
-    return { success: true, enabled };
-});
-
-// Audio scheduling operations
-ipcMain.handle('schedule-audio', async (event, time, config) => {
-    try {
-        const scheduledTime = new Date(time);
-        const id = audioScheduler.scheduleAudio(scheduledTime, config);
-        console.log(`[IPC] Scheduled audio ${id} for ${scheduledTime.toISOString()}`);
-        return { success: true, id };
-    } catch (error) {
-        console.error('[IPC] Failed to schedule audio:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('cancel-audio', async (event, id) => {
-    try {
-        const cancelled = audioScheduler.cancelScheduledAudio(id);
-        if (cancelled) {
-            console.log(`[IPC] Cancelled audio ${id}`);
-            return { success: true };
-        } else {
-            return { success: false, error: 'Audio not found' };
-        }
-    } catch (error) {
-        console.error('[IPC] Failed to cancel audio:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('get-scheduled-audio', async () => {
-    try {
-        const scheduled = audioScheduler.getUpcomingSchedules();
-        return { success: true, data: scheduled };
-    } catch (error) {
-        console.error('[IPC] Failed to get scheduled audio:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('play-audio-now', async (event, config) => {
-    try {
-        await audioScheduler.playAudioNow(config);
-        console.log('[IPC] Playing audio immediately');
-        return { success: true };
-    } catch (error) {
-        console.error('[IPC] Failed to play audio:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('get-audio-queue-status', async () => {
-    try {
-        const status = audioScheduler.getQueueStatus();
-        return { success: true, data: status };
-    } catch (error) {
-        console.error('[IPC] Failed to get queue status:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Handle audio trigger events from scheduler
-audioScheduler.on('audio-trigger', (audioData) => {
-    console.log(`[AudioScheduler] Audio triggered: ${audioData.id}`);
-
-    // Send notification
-    if (Notification.isSupported()) {
-        const notificationTitle = audioData.config.title || 'School Bell';
-        const notificationBody = audioData.config.announcement || 'Bell is ringing';
-
-        new Notification({
-            title: notificationTitle,
-            body: notificationBody,
-            icon: path.join(__dirname, 'build/icon.png')
-        }).show();
-    }
-
-    // Send event to renderer process to trigger audio playback
-    if (mainWindow) {
-        mainWindow.webContents.send('scheduled-audio-trigger', audioData);
-    }
-});
-
-// Handle audio playback events
-audioScheduler.on('play-audio', async (audioData) => {
-    console.log(`[AudioScheduler] Play audio: ${audioData.id}`);
-
-    try {
-        // Use audio player to handle playback
-        if (audioPlayer) {
-            await audioPlayer.playAudio(audioData);
-        } else {
-            console.error('[AudioScheduler] Audio player not initialized');
-        }
-    } catch (error) {
-        console.error('[AudioScheduler] Audio playback failed:', error);
-        // Notify scheduler that audio finished (with error)
-        audioScheduler.audioFinished();
-    }
-});
-
-// Audio playback completion handler
-ipcMain.on('audio-playback-complete', (event, audioId, success, error) => {
-    console.log(`[IPC] Audio playback complete: ${audioId}, success: ${success}`);
-
-    // Notify audio player
-    if (audioPlayer) {
-        audioPlayer.audioCompleted(audioId, success, error);
-    }
-
-    // Notify scheduler to process next in queue
-    audioScheduler.audioFinished();
-});
-
-// Audio player info handlers
-ipcMain.handle('get-audio-history', async (event, limit) => {
-    try {
-        if (!audioPlayer) {
-            return { success: false, error: 'Audio player not initialized' };
-        }
-        const history = audioPlayer.getHistory(limit);
-        return { success: true, data: history };
-    } catch (error) {
-        console.error('[IPC] Failed to get audio history:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('get-audio-statistics', async () => {
-    try {
-        if (!audioPlayer) {
-            return { success: false, error: 'Audio player not initialized' };
-        }
-        const stats = audioPlayer.getStatistics();
-        return { success: true, data: stats };
-    } catch (error) {
-        console.error('[IPC] Failed to get audio statistics:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-ipcMain.handle('get-default-audio-device', async () => {
-    try {
-        if (!audioPlayer) {
-            return { success: false, error: 'Audio player not initialized' };
-        }
-        const device = audioPlayer.getDefaultAudioDevice();
-        return { success: true, data: device };
-    } catch (error) {
-        console.error('[IPC] Failed to get default audio device:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Background mode settings
-ipcMain.handle('get-run-in-background', () => {
-    const enabled = store.get('runInBackground', true);
-    return { success: true, enabled };
-});
-
-ipcMain.handle('set-run-in-background', async (event, enabled) => {
-    try {
-        store.set('runInBackground', enabled);
-        console.log('[Background] Run in background', enabled ? 'enabled' : 'disabled');
-        return { success: true, enabled };
-    } catch (error) {
-        console.error('[Background] Failed to set run in background:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// App lifecycle
-app.whenReady().then(async () => {
-    await initStore();
-    await ensureDataDirectory();
-    createWindow();
-    createTray();
-
-    // Set up auto-start if enabled
-    const autoStart = store.get('autoStart', false);
-    app.setLoginItemSettings({
-        openAtLogin: autoStart,
-        openAsHidden: false
-    });
+app.on('ready', () => {
+  ensureAppDataDir();
+  createWindow();
+  createTray();
 });
 
 app.on('window-all-closed', () => {
-    // Don't quit when running in background mode
-    // The app continues running in the system tray
-    const runInBackground = store ? store.get('runInBackground', true) : true;
-    if (!runInBackground) {
-        app.quit();
-    }
-    // If running in background, do nothing - app stays in tray
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    } else if (mainWindow) {
-        mainWindow.show();
-    }
+  if (mainWindow === null) {
+    createWindow();
+  }
 });
 
-// Graceful shutdown - ensure all data is written
-app.on('before-quit', async (event) => {
-    if (!app.isQuitting) {
-        event.preventDefault();
-        app.isQuitting = true;
+// IPC Handlers
 
-        // Give time for any pending writes to complete
-        await new Promise(resolve => setTimeout(resolve, 1000));
+// Settings
+ipcMain.handle('save-settings', async (event, settings) => {
+  try {
+    store.set('settings', settings);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
-        app.quit();
+ipcMain.handle('load-settings', async () => {
+  try {
+    const settings = store.get('settings', {});
+    return { success: true, data: settings };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Timetable
+ipcMain.handle('save-timetable', async (event, timetable) => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const filePath = path.join(dataPath, 'timetable.json');
+    fs.writeFileSync(filePath, JSON.stringify(timetable, null, 2), 'utf8');
+    store.set('timetable', timetable);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('load-timetable', async () => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const filePath = path.join(dataPath, 'timetable.json');
+    
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      const timetable = JSON.parse(data);
+      return { success: true, data: timetable };
     }
+    
+    return { success: true, data: null };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Schools/Classes
+ipcMain.handle('save-schools', async (event, schools) => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const filePath = path.join(dataPath, 'schools.json');
+    fs.writeFileSync(filePath, JSON.stringify(schools, null, 2), 'utf8');
+    store.set('schools', schools);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('load-schools', async () => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const filePath = path.join(dataPath, 'schools.json');
+    
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      const schools = JSON.parse(data);
+      return { success: true, data: schools };
+    }
+    
+    return { success: true, data: [] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Audio/Bells
+ipcMain.handle('save-bells', async (event, bells) => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const filePath = path.join(dataPath, 'bells.json');
+    fs.writeFileSync(filePath, JSON.stringify(bells, null, 2), 'utf8');
+    store.set('bells', bells);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('load-bells', async () => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const filePath = path.join(dataPath, 'bells.json');
+    
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      const bells = JSON.parse(data);
+      return { success: true, data: bells };
+    }
+    
+    return { success: true, data: [] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Export data
+ipcMain.handle('export-data', async (event) => {
+  try {
+    const dataPath = ensureAppDataDir();
+    const exportData = {
+      settings: store.get('settings', {}),
+      timetable: store.get('timetable', null),
+      schools: store.get('schools', []),
+      bells: store.get('bells', []),
+      timestamp: new Date().toISOString()
+    };
+    
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: path.join(app.getPath('documents'), `ghana-bells-${Date.now()}.json`),
+      filters: [{ name: 'JSON Files', extensions: ['json'] }]
+    });
+    
+    if (!result.canceled) {
+      fs.writeFileSync(result.filePath, JSON.stringify(exportData, null, 2), 'utf8');
+      return { success: true, path: result.filePath };
+    }
+    
+    return { success: false, error: 'Export cancelled' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Import data
+ipcMain.handle('import-data', async (event) => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      const data = fs.readFileSync(result.filePaths[0], 'utf8');
+      const importedData = JSON.parse(data);
+      
+      // Save imported data to store and files
+      if (importedData.settings) store.set('settings', importedData.settings);
+      if (importedData.timetable) store.set('timetable', importedData.timetable);
+      if (importedData.schools) store.set('schools', importedData.schools);
+      if (importedData.bells) store.set('bells', importedData.bells);
+      
+      const dataPath = ensureAppDataDir();
+      if (importedData.timetable) {
+        fs.writeFileSync(
+          path.join(dataPath, 'timetable.json'),
+          JSON.stringify(importedData.timetable, null, 2),
+          'utf8'
+        );
+      }
+      if (importedData.schools) {
+        fs.writeFileSync(
+          path.join(dataPath, 'schools.json'),
+          JSON.stringify(importedData.schools, null, 2),
+          'utf8'
+        );
+      }
+      if (importedData.bells) {
+        fs.writeFileSync(
+          path.join(dataPath, 'bells.json'),
+          JSON.stringify(importedData.bells, null, 2),
+          'utf8'
+        );
+      }
+      
+      return { success: true, data: importedData };
+    }
+    
+    return { success: false, error: 'Import cancelled' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Get app data path
+ipcMain.handle('get-app-data-path', async () => {
+  return { success: true, path: getAppDataPath() };
+});
+
+// Get app version
+ipcMain.handle('get-app-version', async () => {
+  return { success: true, version: app.getVersion() };
+});
+
+// Get app info
+ipcMain.handle('get-app-info', async () => {
+  try {
+    const dataPath = getAppDataPath();
+    const stats = {
+      dataPath,
+      platform: process.platform,
+      nodeVersion: process.version,
+      electronVersion: process.versions.electron,
+      appVersion: app.getVersion(),
+      userDataPath: app.getPath('userData')
+    };
+    return { success: true, data: stats };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Notification
+ipcMain.handle('show-notification', async (event, { title, body }) => {
+  try {
+    new Notification({
+      title,
+      body,
+      icon: path.join(__dirname, 'assets/icon.png')
+    }).show();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });

@@ -1,0 +1,210 @@
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║              📱 ANDROID APK - QUICK START                      ║
+║           Ghana School Bell System                             ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+
+🚀 FASTEST WAY TO BUILD APK
+═══════════════════════════════════════════════════════════════
+
+  Option 1: Run the Build Script (Easiest)
+  ─────────────────────────────────────────
+  
+  Double-click: BUILD-ANDROID-APK.bat
+  
+  This will:
+  → Install EAS CLI if needed
+  → Help you login to Expo
+  → Start the cloud build
+  → Give you download link when done
+
+
+  Option 2: Manual Commands
+  ──────────────────────────
+  
+  1. Install EAS CLI:
+     npm install -g eas-cli
+  
+  2. Login to Expo:
+     eas login
+  
+  3. Build APK:
+     eas build --platform android --profile preview
+  
+  4. Wait 10-15 minutes
+  
+  5. Download APK from link provided
+
+
+📋 WHAT YOU NEED
+═══════════════════════════════════════════════════════════════
+
+  ✓ Node.js installed (you have this)
+  ✓ Internet connection
+  ✓ Expo account (free - create at expo.dev/signup)
+  
+  That's it! No Android Studio needed!
+
+
+🎯 STEP-BY-STEP
+═══════════════════════════════════════════════════════════════
+
+  Step 1: Create Expo Account
+  ────────────────────────────
+  Go to: https://expo.dev/signup
+  Sign up (it's free)
+
+
+  Step 2: Run Build Script
+  ─────────────────────────
+  Double-click: BUILD-ANDROID-APK.bat
+  Follow the prompts
+
+
+  Step 3: Wait for Build
+  ──────────────────────
+  Build takes 10-15 minutes
+  You'll get email when done
+  Check status: https://expo.dev
+
+
+  Step 4: Download APK
+  ────────────────────
+  Click download link from email
+  Or get from: https://expo.dev
+  Save APK file
+
+
+  Step 5: Install on Android
+  ──────────────────────────
+  Transfer APK to Android device
+  Open file on device
+  Tap to install
+  Allow "Install from unknown sources"
+  Done!
+
+
+📱 INSTALLING APK ON ANDROID DEVICE
+═══════════════════════════════════════════════════════════════
+
+  Method 1: USB Cable
+  ───────────────────
+  1. Connect Android device to computer
+  2. Copy APK to device
+  3. On device, open Files app
+  4. Find APK file
+  5. Tap to install
+
+
+  Method 2: Cloud Link
+  ────────────────────
+  1. Upload APK to Google Drive
+  2. Open Drive on Android device
+  3. Download APK
+  4. Tap to install
+
+
+  Method 3: Email
+  ───────────────
+  1. Email APK to yourself
+  2. Open email on Android device
+  3. Download attachment
+  4. Tap to install
+
+
+⚙️ CONFIGURATION FILES
+═══════════════════════════════════════════════════════════════
+
+  ✓ app.json - App configuration (already set up)
+  ✓ eas.json - Build configuration (created for you)
+  ✓ package.json - Dependencies (ready)
+
+
+📄 DOCUMENTATION
+═══════════════════════════════════════════════════════════════
+
+  BUILD-ANDROID-APK-GUIDE.md
+  → Complete guide with all options
+  → Troubleshooting tips
+  → Testing checklist
+
+
+🔧 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+  Problem: "eas: command not found"
+  Solution: npm install -g eas-cli
+
+
+  Problem: "Not logged in"
+  Solution: eas login
+
+
+  Problem: Build fails
+  Solution: 
+  - Check internet connection
+  - Make sure logged in: eas login
+  - Try again
+
+
+  Problem: Can't install APK on device
+  Solution:
+  - Enable "Install from unknown sources"
+  - Settings → Security → Unknown sources
+
+
+✅ WHAT YOU'LL GET
+═══════════════════════════════════════════════════════════════
+
+  APK File: ghana-school-bell.apk
+  Size: ~30-50 MB
+  
+  Features:
+  ✓ Bell scheduling
+  ✓ Timetable management
+  ✓ Notifications
+  ✓ Audio playback
+  ✓ Offline capability
+  ✓ Background operation
+
+
+🎉 READY TO BUILD!
+═══════════════════════════════════════════════════════════════
+
+  Quick Start:
+  
+  1. Run: BUILD-ANDROID-APK.bat
+  2. Login to Expo
+  3. Wait for build
+  4. Download APK
+  5. Install on Android device
+  
+  That's it!
+
+
+📧 NEED HELP?
+═══════════════════════════════════════════════════════════════
+
+  Read: BUILD-ANDROID-APK-GUIDE.md
+  
+  Or ask me:
+  - "How do I build Android APK?"
+  - "Build failed, what do I do?"
+  - "How do I install APK on device?"
+
+
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║  🚀 START HERE: Run BUILD-ANDROID-APK.bat                     ║
+║                                                                ║
+║  It will guide you through the entire process!                ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+
+Status: ✅ READY TO BUILD
+Method: EAS Build (cloud-based)
+Time: ~10-15 minutes
+Output: APK file for Android

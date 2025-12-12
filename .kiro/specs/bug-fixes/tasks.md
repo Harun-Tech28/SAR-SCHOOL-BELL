@@ -145,7 +145,53 @@
   - **Property 13: Hydration Consistency**
   - **Validates: Requirements 7.1, 7.2, 7.3**
 
-- [ ] 9. Final validation and cleanup
+- [x] 9. Fix Electron timetable data persistence and UI display
+
+
+
+
+
+
+  - Modify electron-storage-adapter to load file system data on app startup
+  - Ensure file system data takes precedence over localStorage
+  - Add synchronization logic to merge file system data into Zustand store
+  - Verify timetables display correctly after app restart
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+
+- [ ]* 9.1 Write property test for file system to UI data sync
+  - **Property 14: File System to UI Data Sync**
+  - **Validates: Requirements 8.1, 8.2, 8.3**
+
+- [ ]* 9.2 Write property test for data source priority
+  - **Property 15: Data Source Priority**
+  - **Validates: Requirements 8.4**
+
+- [ ]* 9.3 Write property test for dual storage write
+  - **Property 16: Dual Storage Write**
+  - **Validates: Requirements 8.5**
+
+- [ ] 10. Add comprehensive storage diagnostics and verification
+
+
+
+
+
+
+  - Add detailed logging to all storage operations
+  - Implement write verification (read-back after write)
+  - Add file system permission checks on startup
+  - Create diagnostic tool to test storage health
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [ ]* 10.1 Write property test for storage operation logging
+  - **Property 17: Storage Operation Logging**
+  - **Validates: Requirements 9.1, 9.2**
+
+- [ ]* 10.2 Write property test for write verification
+  - **Property 18: Write Verification**
+  - **Validates: Requirements 9.4**
+
+- [ ] 11. Final validation and cleanup
 
 
   - Run complete build process to verify all fixes

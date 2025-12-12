@@ -2,6 +2,8 @@ import type React from "react"
 // ... existing code ...
 import type { Metadata, Viewport } from "next"
 import { AppInit } from "@/components/app-init"
+import { StorageSync } from "@/components/storage-sync"
+import { StorageErrorToast } from "@/components/storage-error-toast"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -76,6 +78,8 @@ export default function RootLayout({
       </head>
       <body className={`font-sans antialiased`}>
         <AppInit />
+        <StorageSync />
+        <StorageErrorToast />
         {children}
       </body>
     </html>

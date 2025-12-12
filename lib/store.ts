@@ -236,18 +236,22 @@ export const useStore = create<SchoolStore>()(
         set((state) => {
           const newTimetables = [...state.timetables, timetable]
           console.log("🔵 Store: New timetables array:", newTimetables)
-          // Sync to IndexedDB
-          syncTimetablesToDB(newTimetables).catch(console.error)
+          // Sync to IndexedDB and notify Service Worker (non-blocking)
+          syncTimetablesToDB(newTimetables).catch((error) => {
+            console.warn("⚠️ IndexedDB sync failed (non-critical):", error)
+          })
           return { timetables: newTimetables }
         })
-        console.log("🔵 Store: addTimetable completed")
+        console.log("🔵 Store: addTimetable completed successfully")
       },
       removeTimetable: (id) => {
         console.log("🔵 Store: removeTimetable called with id:", id)
         set((state) => {
           const newTimetables = state.timetables.filter((t) => t.id !== id)
-          // Sync to IndexedDB
-          syncTimetablesToDB(newTimetables).catch(console.error)
+          // Sync to IndexedDB (non-blocking)
+          syncTimetablesToDB(newTimetables).catch((error) => {
+            console.warn("⚠️ IndexedDB sync failed (non-critical):", error)
+          })
           return { timetables: newTimetables }
         })
       },
@@ -255,8 +259,10 @@ export const useStore = create<SchoolStore>()(
         console.log("🔵 Store: updateTimetable called with id:", id, "updates:", updates)
         set((state) => {
           const newTimetables = state.timetables.map((t) => (t.id === id ? { ...t, ...updates } : t))
-          // Sync to IndexedDB
-          syncTimetablesToDB(newTimetables).catch(console.error)
+          // Sync to IndexedDB (non-blocking)
+          syncTimetablesToDB(newTimetables).catch((error) => {
+            console.warn("⚠️ IndexedDB sync failed (non-critical):", error)
+          })
           return { timetables: newTimetables }
         })
       },
@@ -275,6 +281,32 @@ export const useStore = create<SchoolStore>()(
       version: 1,
       onRehydrateStorage: () => {
         console.log("🔄 Store rehydration started")
+        
+        // Listen for Electron storage sync events
+        if (typeof window !== 'undefined') {
+          window.addEventListener('electron-storage-sync', ((event: CustomEvent) => {
+            console.log('🔄 Electron storage sync event received:', event.detail.key)
+            
+            // Force Zustand to rehydrate from the updated localStorage
+            try {
+              const data = JSON.parse(event.detail.value)
+              if (data && data.state) {
+                console.log('🔄 Forcing store update with file system data')
+                console.log('📊 File system data:', {
+                  studentsCount: data.state.students?.length || 0,
+                  timetablesCount: data.state.timetables?.length || 0,
+                  devicesCount: data.state.devices?.length || 0,
+                })
+                
+                // Manually update the store with file system data
+                useStore.setState(data.state, true)
+              }
+            } catch (error) {
+              console.error('❌ Failed to parse sync data:', error)
+            }
+          }) as EventListener)
+        }
+        
         return (state, error) => {
           if (error) {
             console.error("❌ Store rehydration FAILED:", error)

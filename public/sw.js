@@ -166,112 +166,379 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Helper to open IndexedDB
+// ============================================================================
+// BACKGROUND BELL SCHEDULING SYSTEM
+// ============================================================================
+
+// Database configuration - must match IndexedDB manager
+const DB_NAME = 'SchoolBellDB';
+const DB_VERSION = 2;
+const TIMETABLES_STORE = 'timetables';
+const LOGS_STORE = 'bellLogs';
+
+// Bell scheduling state
+let schedules = [];
+let checkInterval = null;
+let lastCheckedMinute = '';
+
+/**
+ * Open IndexedDB connection
+ */
 function openDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('SchoolBellSyncDB', 1);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains('timetables')) {
-                db.createObjectStore('timetables', { keyPath: 'id' });
-            }
-        };
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onerror = () => {
+      console.error('[SW] Failed to open IndexedDB:', request.error);
+      reject(request.error);
+    };
+    
+    request.onsuccess = () => {
+      console.log('[SW] IndexedDB opened successfully');
+      resolve(request.result);
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      console.log('[SW] Upgrading IndexedDB schema...');
+      
+      // Create timetables store if needed
+      if (!db.objectStoreNames.contains(TIMETABLES_STORE)) {
+        const timetableStore = db.createObjectStore(TIMETABLES_STORE, { keyPath: 'id' });
+        timetableStore.createIndex('isActive', 'isActive', { unique: false });
+        timetableStore.createIndex('day', 'day', { unique: false });
+        console.log('[SW] Created timetables store');
+      }
+      
+      // Create logs store if needed
+      if (!db.objectStoreNames.contains(LOGS_STORE)) {
+        const logsStore = db.createObjectStore(LOGS_STORE, { keyPath: 'id' });
+        logsStore.createIndex('executionTime', 'executionTime', { unique: false });
+        logsStore.createIndex('status', 'status', { unique: false });
+        console.log('[SW] Created logs store');
+      }
+    };
+  });
+}
+
+/**
+ * Load schedules from IndexedDB
+ */
+async function loadSchedules() {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([TIMETABLES_STORE], 'readonly');
+    const store = transaction.objectStore(TIMETABLES_STORE);
+    const request = store.getAll();
+    
+    const timetables = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
     });
-}
-
-// Background sync for scheduled bells
-self.addEventListener('periodicsync', (event) => {
-    if (event.tag === 'bell-schedule') {
-        event.waitUntil(checkScheduleAndPlayBell());
-    }
-});
-
-// Message handler for scheduled bells from the app
-self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SCHEDULE_BELL') {
-        const { time, config } = event.data;
-        scheduleBellAlarm(time, config);
-    }
-});
-
-// Store scheduled bells
-let scheduledBells = [];
-
-function scheduleBellAlarm(time, config) {
-    const bellTime = new Date(time);
-    const now = new Date();
-    const delay = bellTime.getTime() - now.getTime();
-
-    if (delay > 0) {
-        scheduledBells.push({
-            time: bellTime,
-            config,
-            timeout: setTimeout(() => {
-                playBellInBackground(config);
-            }, delay)
+    
+    console.log(`[SW] Loaded ${timetables.length} timetables from IndexedDB`);
+    
+    // Convert timetables to schedules
+    schedules = [];
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    
+    timetables.forEach(tt => {
+      // Check if timetable is active and matches today or is Daily
+      if (tt.isActive !== false && (tt.day === 'Daily' || tt.day === today)) {
+        schedules.push({
+          id: tt.id,
+          timetableName: tt.name,
+          time: tt.bellTime,
+          day: tt.day,
+          bellType: tt.bellType,
+          voice: tt.voice,
+          customMessage: tt.customMessage,
+          customAudioId: tt.customAudioId,
+          triggered: false
         });
-        console.log('[SW] Bell scheduled for', bellTime);
-    }
+      }
+    });
+    
+    console.log(`[SW] Created ${schedules.length} active schedules for today`);
+    return schedules;
+  } catch (error) {
+    console.error('[SW] Failed to load schedules:', error);
+    return [];
+  }
 }
 
-async function playBellInBackground(config) {
-    console.log('[SW] Playing bell in background');
+/**
+ * Check schedules and trigger bells
+ */
+async function checkSchedules() {
+  const now = new Date();
+  const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                      now.getMinutes().toString().padStart(2, '0');
+  
+  // Only check once per minute
+  if (currentTime === lastCheckedMinute) {
+    return;
+  }
+  lastCheckedMinute = currentTime;
+  
+  console.log(`[SW] Checking schedules at ${currentTime}...`);
+  
+  // Check each schedule
+  for (const schedule of schedules) {
+    if (schedule.time === currentTime && !schedule.triggered) {
+      console.log(`[SW] ⏰ Bell triggered: ${schedule.timetableName} at ${schedule.time}`);
+      schedule.triggered = true;
+      
+      // Trigger the bell
+      await triggerBell(schedule);
+      
+      // Reset triggered flag after 2 minutes
+      setTimeout(() => {
+        schedule.triggered = false;
+      }, 120000);
+    }
+  }
+}
+
+/**
+ * Trigger a bell event
+ */
+async function triggerBell(schedule) {
+  try {
+    console.log('[SW] Triggering bell:', schedule.timetableName);
     
     // Show notification
-    await self.registration.showNotification('School Bell', {
-        body: config.announcement || 'Bell is ringing',
-        icon: '/icon-192x192.svg',
-        badge: '/icon-192x192.svg',
-        tag: 'bell-notification',
-        requireInteraction: false,
-        silent: false, // Play default notification sound
-    });
+    await showBellNotification(schedule);
+    
+    // Try to play audio
+    await playBellAudio(schedule);
+    
+    // Log execution
+    await logBellExecution(schedule, 'success');
+    
+  } catch (error) {
+    console.error('[SW] Failed to trigger bell:', error);
+    await logBellExecution(schedule, 'failed', error.message);
+  }
+}
 
-    // Try to wake up the app and play audio
+/**
+ * Show bell notification
+ */
+async function showBellNotification(schedule) {
+  try {
+    const notificationOptions = {
+      body: schedule.customMessage || `${schedule.timetableName} - ${schedule.time}`,
+      icon: '/icon-192x192.svg',
+      badge: '/icon-192x192.svg',
+      tag: `bell-${schedule.id}`,
+      requireInteraction: false,
+      silent: false,
+      vibrate: [200, 100, 200], // Vibration pattern
+      data: {
+        scheduleId: schedule.id,
+        time: schedule.time,
+        url: '/'
+      }
+    };
+    
+    await self.registration.showNotification('🔔 School Bell', notificationOptions);
+    console.log('[SW] Notification displayed');
+  } catch (error) {
+    console.error('[SW] Failed to show notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Play bell audio
+ */
+async function playBellAudio(schedule) {
+  try {
+    // Check if any clients are open
     const clients = await self.clients.matchAll({ 
-        includeUncontrolled: true,
-        type: 'window'
+      includeUncontrolled: true,
+      type: 'window'
     });
-
+    
     if (clients.length > 0) {
-        // App is open - send message to play audio
-        clients.forEach(client => {
-            client.postMessage({
-                type: 'PLAY_BELL',
-                payload: config
-            });
+      // App is open - send message to play audio
+      console.log('[SW] App is open, sending play message to clients');
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'PLAY_BELL',
+          payload: schedule
         });
+      });
     } else {
-        // App is closed - open it
-        await self.clients.openWindow('/');
+      // App is closed - open it in background to play audio
+      console.log('[SW] App is closed, opening in background');
+      await self.clients.openWindow('/?bell=' + schedule.id);
     }
+  } catch (error) {
+    console.error('[SW] Failed to play audio:', error);
+    // Don't throw - notification already shown
+  }
 }
 
-async function checkScheduleAndPlayBell() {
-    try {
-        const db = await openDB();
-        const transaction = db.transaction('timetables', 'readonly');
-        const store = transaction.objectStore('timetables');
-        const request = store.getAll();
+/**
+ * Log bell execution
+ */
+async function logBellExecution(schedule, status, error = null) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([LOGS_STORE], 'readwrite');
+    const store = transaction.objectStore(LOGS_STORE);
+    
+    const log = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      scheduleId: schedule.id,
+      timetableName: schedule.timetableName,
+      bellLabel: schedule.timetableName,
+      executionTime: new Date(),
+      scheduledTime: schedule.time,
+      status: status,
+      method: 'background-pwa',
+      error: error,
+      deviceInfo: {
+        browser: 'Service Worker',
+        os: 'Android',
+        batteryLevel: null
+      }
+    };
+    
+    await new Promise((resolve, reject) => {
+      const request = store.add(log);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    
+    console.log('[SW] Bell execution logged');
+  } catch (error) {
+    console.error('[SW] Failed to log execution:', error);
+    // Don't throw - this is non-critical
+  }
+}
 
-        const timetables = await new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
+/**
+ * Start schedule monitoring
+ */
+function startScheduleMonitoring() {
+  if (checkInterval) {
+    clearInterval(checkInterval);
+  }
+  
+  // Check every 10 seconds
+  checkInterval = setInterval(() => {
+    checkSchedules();
+  }, 10000);
+  
+  console.log('[SW] Schedule monitoring started (checking every 10 seconds)');
+}
 
-        const now = new Date();
-        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
-                          now.getMinutes().toString().padStart(2, '0');
-        const currentDay = now.getDay(); // 0-6
+/**
+ * Stop schedule monitoring
+ */
+function stopScheduleMonitoring() {
+  if (checkInterval) {
+    clearInterval(checkInterval);
+    checkInterval = null;
+    console.log('[SW] Schedule monitoring stopped');
+  }
+}
 
-        for (const tt of timetables) {
-            if (tt.time === currentTime && tt.days && tt.days.includes(currentDay)) {
-                await playBellInBackground(tt);
+// ============================================================================
+// SERVICE WORKER EVENT HANDLERS
+// ============================================================================
+
+// Activate event - load schedules and start monitoring
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating service worker...');
+  event.waitUntil(
+    Promise.all([
+      // Clean up old caches
+      caches.keys().then((cacheNames) => {
+        const validCacheNames = Object.values(CACHE_NAMES);
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (!validCacheNames.includes(cacheName)) {
+              console.log('[SW] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
             }
+          })
+        );
+      }),
+      // Load schedules and start monitoring
+      loadSchedules().then(() => {
+        startScheduleMonitoring();
+      })
+    ])
+    .then(() => {
+      console.log('[SW] Service worker activated');
+      return self.clients.claim();
+    })
+  );
+});
+
+// Message handler - handle commands from PWA
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data?.type);
+  
+  if (!event.data) return;
+  
+  switch (event.data.type) {
+    case 'RELOAD_SCHEDULES':
+      // Reload schedules from IndexedDB
+      loadSchedules().then(() => {
+        console.log('[SW] Schedules reloaded');
+      });
+      break;
+      
+    case 'GET_STATUS':
+      // Send status back to client
+      event.ports[0]?.postMessage({
+        isActive: checkInterval !== null,
+        scheduledBellsCount: schedules.length,
+        lastCheckedMinute: lastCheckedMinute
+      });
+      break;
+      
+    case 'CHECK_NOW':
+      // Force immediate check
+      checkSchedules();
+      break;
+      
+    default:
+      console.log('[SW] Unknown message type:', event.data.type);
+  }
+});
+
+// Notification click handler - open app
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked');
+  event.notification.close();
+  
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If app is already open, focus it
+        for (const client of clientList) {
+          if (client.url === self.registration.scope && 'focus' in client) {
+            return client.focus();
+          }
         }
-    } catch (error) {
-        console.error('[SW] Background sync failed:', error);
-    }
-}
+        // Otherwise open new window
+        if (self.clients.openWindow) {
+          return self.clients.openWindow('/');
+        }
+      })
+  );
+});
+
+// Periodic background sync (if supported)
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'bell-schedule') {
+    console.log('[SW] Periodic sync triggered');
+    event.waitUntil(checkSchedules());
+  }
+});

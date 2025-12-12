@@ -1,0 +1,63 @@
+GHANA SCHOOL BELL SYSTEM - INSTALLATION INSTRUCTIONS
+====================================================
+
+WHAT'S ON THIS USB:
+- Complete Ghana School Bell application
+- Ready to run, no installation needed
+
+TWO WAYS TO USE:
+================
+
+OPTION 1: RUN DIRECTLY FROM USB (QUICK & EASY)
+-----------------------------------------------
+1. Insert USB into computer
+2. Open USB drive
+3. Open "win-unpacked" folder
+4. Double-click "Ghana School Bell.exe"
+5. Done! App is running
+
+NOTES:
+- Keep USB plugged in while using
+- Your timetables save to the USB
+- Can use on any computer with this USB
+
+OPTION 2: COPY TO COMPUTER (PERMANENT INSTALLATION)
+----------------------------------------------------
+1. Copy the entire "win-unpacked" folder from USB to your Desktop
+2. Open the copied folder on Desktop
+3. Double-click "Ghana School Bell.exe"
+4. Done! App is running
+
+NOTES:
+- USB can be removed after copying
+- App stays on this computer permanently
+- Your timetables save to this computer
+
+IMPORTANT NOTES:
+----------------
+- Keep ALL files together in the same folder
+- Don't delete any files from the folder
+- The app saves your timetables automatically
+- Bells will ring even if you close the window
+- To fully quit: Right-click the bell icon in system tray (bottom-right) and select "Quit"
+
+FIRST TIME SETUP:
+-----------------
+1. Click "Timetable" in the app
+2. Click "Add Timetable" 
+3. Set your school's bell schedule
+4. Click "Save"
+5. Done! Bells will ring automatically
+
+TROUBLESHOOTING:
+----------------
+- If app doesn't open: Make sure you copied ALL files from USB
+- If no sound: Check your computer's volume settings
+- If bells don't ring: Make sure the app is running (check system tray)
+
+CONTACT:
+--------
+For support, contact: [YOUR CONTACT INFO]
+
+Version: 1.0
+Date: December 2024

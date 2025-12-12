@@ -97,3 +97,27 @@ This document outlines the requirements for fixing critical bugs and issues in t
 3. WHEN the application loads THEN the system SHALL complete hydration without mismatches
 4. WHEN components use client-side state THEN the system SHALL initialize state consistently between server and client
 5. WHEN the browser console is checked THEN the system SHALL display no hydration error warnings
+
+### Requirement 8
+
+**User Story:** As a school administrator, I want my timetable data to persist and display correctly when I reopen the Electron app, so that I can see my saved schedules in the UI.
+
+#### Acceptance Criteria
+
+1. WHEN the Electron app starts THEN the system SHALL load timetable data from the file system into the UI
+2. WHEN timetable data exists in the file system THEN the system SHALL synchronize it with localStorage on app startup
+3. WHEN the app is closed and reopened THEN the system SHALL display all previously saved timetables in the UI
+4. WHEN the store rehydrates THEN the system SHALL prioritize file system data over stale localStorage data
+5. WHEN timetable data is saved THEN the system SHALL write to both localStorage and file system immediately
+
+### Requirement 9
+
+**User Story:** As a developer, I want comprehensive diagnostic logging for storage operations, so that I can identify and fix data persistence failures quickly.
+
+#### Acceptance Criteria
+
+1. WHEN a save operation is attempted THEN the system SHALL log the operation start, data size, and completion status
+2. WHEN a save operation fails THEN the system SHALL log the specific error message and stack trace
+3. WHEN the app starts THEN the system SHALL verify file system write permissions and log the results
+4. WHEN storage operations complete THEN the system SHALL verify the data was written correctly by reading it back
+5. WHEN localStorage quota is exceeded THEN the system SHALL log a clear error message and attempt recovery

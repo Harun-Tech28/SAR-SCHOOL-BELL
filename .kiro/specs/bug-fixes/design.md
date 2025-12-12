@@ -121,6 +121,26 @@ After analyzing the acceptance criteria, several properties can be consolidated:
 *For any* component rendered on both server and client, the HTML structure and attributes should be identical to prevent hydration mismatches
 **Validates: Requirements 7.1, 7.2, 7.3**
 
+**Property 14: File System to UI Data Sync**
+*For any* timetable data stored in the file system, when the Electron app starts, that data should be loaded and displayed in the UI
+**Validates: Requirements 8.1, 8.2, 8.3**
+
+**Property 15: Data Source Priority**
+*For any* app startup where both file system and localStorage contain timetable data, the file system data should take precedence and overwrite stale localStorage data
+**Validates: Requirements 8.4**
+
+**Property 16: Dual Storage Write**
+*For any* timetable save operation, the data should be written to both localStorage and file system successfully
+**Validates: Requirements 8.5**
+
+**Property 17: Storage Operation Logging**
+*For any* storage operation (save or load), the system should log the operation details including success/failure status
+**Validates: Requirements 9.1, 9.2**
+
+**Property 18: Write Verification**
+*For any* successful write operation, reading the data back immediately should return the same data that was written
+**Validates: Requirements 9.4**
+
 ## Error Handling
 
 ### Dependency Resolution Errors

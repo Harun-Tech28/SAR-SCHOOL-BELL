@@ -1,0 +1,92 @@
+═══════════════════════════════════════════════════════════
+GHANA SCHOOL BELL SYSTEM - QUICK START GUIDE
+═══════════════════════════════════════════════════════════
+
+IMPORTANT: THE APP RUNS IN THE BACKGROUND!
+When you double-click the app, it DOES start - but it runs in the
+system tray (background) so bells can ring even when closed.
+
+═══════════════════════════════════════════════════════════
+HOW TO OPEN THE APP WINDOW:
+═══════════════════════════════════════════════════════════
+
+STEP 1: Look at the BOTTOM-RIGHT corner of your screen
+        (where the clock and date are)
+
+STEP 2: Click the UP ARROW (^) icon
+        This shows "hidden icons"
+
+STEP 3: Find the BELL ICON or "Ghana School Bell" icon
+
+STEP 4: CLICK the icon to open the window
+        OR
+        RIGHT-CLICK and select "Show App"
+
+═══════════════════════════════════════════════════════════
+FIRST TIME SETUP:
+═══════════════════════════════════════════════════════════
+
+1. Open the app window (see steps above)
+
+2. Click "TIMETABLE" on the left side
+
+3. Click "ADD TIMETABLE" button
+
+4. Enter your school's bell times:
+   - Bell name (e.g., "Morning Assembly")
+   - Time (e.g., 8:00 AM)
+   - Days (Monday-Friday)
+   - Bell sound
+
+5. Click "SAVE"
+
+6. Repeat for all your school bells
+
+7. DONE! Bells will ring automatically
+
+═══════════════════════════════════════════════════════════
+CHECKING IF APP IS RUNNING:
+═══════════════════════════════════════════════════════════
+
+Press Ctrl+Shift+Esc to open Task Manager
+Look for "Ghana School Bell System.exe"
+If you see it, the app IS running!
+
+═══════════════════════════════════════════════════════════
+IMPORTANT NOTES:
+═══════════════════════════════════════════════════════════
+
+✓ The app MUST be running for bells to ring
+✓ You can close the window - app keeps running in background
+✓ Your timetables are saved automatically
+✓ To FULLY QUIT: Right-click tray icon → "Quit App"
+✓ Keep all files in the same folder together
+
+═══════════════════════════════════════════════════════════
+TROUBLESHOOTING:
+═══════════════════════════════════════════════════════════
+
+Problem: I double-clicked but nothing happened
+Solution: The app IS running! Look in system tray (see steps above)
+
+Problem: I can't find the icon in system tray
+Solution: 1. Click the UP ARROW (^) to show hidden icons
+          2. Check Task Manager - if app is there, it's working
+
+Problem: Bells are not ringing
+Solution: 1. Make sure app is running (check Task Manager)
+          2. Check your timetable is saved
+          3. Check computer volume is not muted
+
+Problem: I want to close the app completely
+Solution: Right-click tray icon → "Quit App"
+
+═══════════════════════════════════════════════════════════
+NEED HELP?
+═══════════════════════════════════════════════════════════
+
+Contact: [YOUR CONTACT INFO HERE]
+
+Version: 1.0
+Date: December 2024
+═══════════════════════════════════════════════════════════

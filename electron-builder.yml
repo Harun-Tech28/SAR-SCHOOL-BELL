@@ -1,0 +1,33 @@
+appId: com.ghana.schoolbell.app
+productName: Ghana School Bell System
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - out/**/*
+  - main.js
+  - preload.js
+  - electron/**/*
+  - assets/**/*
+  - node_modules/**/*
+  - '!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme,test,tests,*.d.ts,source,src,*.spec.js,*.test.js}'
+asar: true
+
+win:
+  target:
+    - nsis
+    - portable
+  icon: assets/icon.ico
+  certificateFile: null
+  certificatePassword: null
+  sign: null
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Ghana School Bell
+
+portable:
+  artifactName: '${productName}-${version}.${ext}'

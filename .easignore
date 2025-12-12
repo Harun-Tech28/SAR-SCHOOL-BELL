@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+dist-fixed/
+dist-new/
+build/
+android/app/build/
+android/.gradle/
+
+# Electron
+electron/
+installer-final/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.github/
+
+# History and logs
+.history-memo/
+*.log
+build-log.txt
+build-debug.log
+
+# Documentation (not needed for build)
+*.md
+*.txt
+*.bat
+
+# Test files
+__tests__/
+.qodo/
+
+# Other
+.expo/
+CLIENT-DELIVERY-PACKAGE/

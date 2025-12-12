@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Default School Day",
+    "bells": [
+      { "time": "08:00", "label": "Assembly", "audio": "bell.wav" },
+      { "time": "10:30", "label": "Break", "audio": "bell.wav" },
+      { "time": "12:30", "label": "Lunch", "audio": "bell.wav" },
+      { "time": "15:00", "label": "End of Day", "audio": "bell.wav" }
+    ]
+  }
+]

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Storage Test - Ghana School Bell</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Storage Diagnostic Test</h1>
+    
+    <div class="test-box">
+        <h2>Environment Check</h2>
+        <div id="env-check"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>Storage Test</h2>
+        <button onclick="testSave()">Test Save</button>
+        <button onclick="testLoad()">Test Load</button>
+        <button onclick="clearStorage()">Clear Storage</button>
+        <div id="storage-test"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>Console Log</h2>
+        <div id="console-log" style="font-family: monospace; font-size: 12px;"></div>
+    </div>
+
+    <script>
+        // Capture console logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const logDiv = document.getElementById('console-log');
+
+        function addLog(message, type = 'log') {
+            const p = document.createElement('p');
+            p.textContent = `[${type.toUpperCase()}] ${message}`;
+            p.className = type === 'error' ? 'error' : '';
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'log');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog(args.join(' '), 'error');
+        };
+
+        // Environment check
+        function checkEnvironment() {
+            const envDiv = document.getElementById('env-check');
+            let html = '';
+
+            html += `<p><strong>Is Electron:</strong> <span class="${window.electronAPI ? 'success' : 'error'}">${window.electronAPI ? 'YES ✓' : 'NO ✗'}</span></p>`;
+            
+            if (window.electronAPI) {
+                html += `<p><strong>electronAPI.isElectron:</strong> <span class="success">${window.electronAPI.isElectron}</span></p>`;
+                html += `<p><strong>Platform:</strong> ${window.electronAPI.platform}</p>`;
+                html += `<p><strong>Has saveTimetable:</strong> <span class="${window.electronAPI.saveTimetable ? 'success' : 'error'}">${window.electronAPI.saveTimetable ? 'YES ✓' : 'NO ✗'}</span></p>`;
+                html += `<p><strong>Has loadTimetable:</strong> <span class="${window.electronAPI.loadTimetable ? 'success' : 'error'}">${window.electronAPI.loadTimetable ? 'YES ✓' : 'NO ✗'}</span></p>`;
+            } else {
+                html += `<p class="error">❌ electronAPI is not available!</p>`;
+                html += `<p class="warning">This means the preload script didn't load correctly.</p>`;
+            }
+
+            html += `<p><strong>localStorage available:</strong> <span class="${typeof localStorage !== 'undefined' ? 'success' : 'error'}">${typeof localStorage !== 'undefined' ? 'YES ✓' : 'NO ✗'}</span></p>`;
+
+            envDiv.innerHTML = html;
+        }
+
+        // Test save
+        async function testSave() {
+            const testDiv = document.getElementById('storage-test');
+            testDiv.innerHTML = '<p>Testing save...</p>';
+
+            const testData = {
+                id: 'test-' + Date.now(),
+                name: 'Test Timetable',
+                bells: [
+                    { time: '08:00', name: 'Morning Bell' }
+                ]
+            };
+
+            console.log('Attempting to save:', testData);
+
+            if (!window.electronAPI) {
+                testDiv.innerHTML += '<p class="error">❌ electronAPI not available!</p>';
+                return;
+            }
+
+            try {
+                const result = await window.electronAPI.saveTimetable(testData);
+                console.log('Save result:', result);
+
+                if (result.success) {
+                    testDiv.innerHTML += '<p class="success">✓ Save successful!</p>';
+                } else {
+                    testDiv.innerHTML += `<p class="error">❌ Save failed: ${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                testDiv.innerHTML += `<p class="error">❌ Exception: ${error.message}</p>`;
+            }
+        }
+
+        // Test load
+        async function testLoad() {
+            const testDiv = document.getElementById('storage-test');
+            testDiv.innerHTML = '<p>Testing load...</p>';
+
+            console.log('Attempting to load...');
+
+            if (!window.electronAPI) {
+                testDiv.innerHTML += '<p class="error">❌ electronAPI not available!</p>';
+                return;
+            }
+
+            try {
+                const result = await window.electronAPI.loadTimetable();
+                console.log('Load result:', result);
+
+                if (result.success) {
+                    testDiv.innerHTML += '<p class="success">✓ Load successful!</p>';
+                    testDiv.innerHTML += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                } else {
+                    testDiv.innerHTML += `<p class="error">❌ Load failed: ${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                testDiv.innerHTML += `<p class="error">❌ Exception: ${error.message}</p>`;
+            }
+        }
+
+        // Clear storage
+        function clearStorage() {
+            localStorage.clear();
+            document.getElementById('storage-test').innerHTML = '<p class="success">✓ localStorage cleared</p>';
+            console.log('localStorage cleared');
+        }
+
+        // Run environment check on load
+        checkEnvironment();
+    </script>
+</body>
+</html>
