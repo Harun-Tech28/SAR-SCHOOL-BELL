@@ -44,5 +44,9 @@ next-env.d.ts
 dist-electron/
 build-output/
 dist/
+dist-fixed/
+dist-new/
 release/
+installer-final/
+CLIENT-DELIVERY-PACKAGE/
 
