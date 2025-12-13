@@ -10,6 +10,7 @@ import {
     playFireAlarmBell,
     playRecessBell
 } from './bell-sounds-extended'
+import { getAudioContext, initializeAudio } from './audio-init'
 
 export type BellType =
     | 'none'  // No bell sound - voice only
@@ -41,14 +42,22 @@ export type BellType =
 /**
  * Play a bell sound based on the type
  */
-export const playBellSound = (type: BellType): void => {
+export const playBellSound = async (type: BellType): Promise<void> => {
     // If 'none' is selected, don't play any bell sound
     if (type === 'none') {
         console.log('[BellSound] No bell selected - voice only mode')
         return
     }
 
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    // CRITICAL FIX: Initialize and resume audio context
+    const initialized = await initializeAudio()
+    if (!initialized) {
+        console.error('[BellSound] Failed to initialize audio context')
+        return
+    }
+
+    const audioContext = getAudioContext()
+    console.log(`[BellSound] Playing bell type: ${type}, Audio context state: ${audioContext.state}`)
 
     switch (type) {
         case 'bell':

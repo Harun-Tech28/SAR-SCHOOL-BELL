@@ -27,6 +27,7 @@ const deriveTaskType = (name: string): string => {
 import { registerBellSync, syncTimetablesToSW } from "@/lib/background-sync"
 import { initBellWorker, updateWorkerSchedules, checkSchedulesNow, terminateBellWorker } from "@/lib/background-bell-manager"
 import { InstallButton } from "@/components/install-button"
+import { AudioTestButton } from "@/components/audio-test-button"
 
 export function Dashboard() {
   const { timetables, students, devices, settings } = useStore()
@@ -506,7 +507,10 @@ export function Dashboard() {
             System Overview & Quick Stats
           </p>
         </div>
-        <InstallButton variant="default" size="default" />
+        <div className="flex items-center gap-2">
+          <AudioTestButton />
+          <InstallButton variant="default" size="default" />
+        </div>
       </div>
 
       {/* Stats Cards with Enhanced Shadows and Hover Effects */}

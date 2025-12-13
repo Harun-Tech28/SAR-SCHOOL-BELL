@@ -107,7 +107,7 @@ export class CompleteBellSystem {
         // 1. Ring the bell multiple times BEFORE voice
         for (let ringNum = 0; ringNum < bellRingsBeforeVoice; ringNum++) {
           console.log(`[BellSystem] Bell ring ${ringNum + 1} of ${bellRingsBeforeVoice}`)
-          playBellSound(bellType)
+          await playBellSound(bellType)
           
           // Wait between bell rings (shorter delay)
           if (ringNum < bellRingsBeforeVoice - 1) {
@@ -161,7 +161,7 @@ export class CompleteBellSystem {
           // Final fallback to built-in tone when custom audio and TTS both fail
           console.log('[BellSystem] Falling back to built-in bell tone')
           try {
-            playBellSound("bell")
+            await playBellSound("bell")
             voiceSuccess = true
           } catch (e) {
             console.error('[BellSystem] Built-in tone failed', e)

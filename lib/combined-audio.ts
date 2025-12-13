@@ -38,7 +38,7 @@ export class CombinedAudioPlayer {
       try {
         // 1. Play the tone first
         console.log(`[CombinedAudio] Playing ${tone} tone...`)
-        playBellSound(tone)
+        await playBellSound(tone)
         
         // 2. Wait for tone to finish
         await new Promise(resolve => setTimeout(resolve, delayBetweenToneAndVoice))
